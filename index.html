@@ -615,7 +615,10 @@ const SLOTS = [ // rig positions [x,z,shelfY] — 0-8 garage desks, 9-20 contain
   [-9,27,0.55],[-9,27,1.9],[-9,27,3.25],[-3,27,0.55],[-3,27,1.9],[-3,27,3.25],
   [ 3,27,0.55],[ 3,27,1.9],[ 3,27,3.25],[ 9,27,0.55],[ 9,27,1.9],[ 9,27,3.25],
 ];
-const SAVEKEY='tmg3d_v1';
+const SAVEKEY='tmg3d_v1';          // DEMO world save (unchanged key — old saves keep working)
+const LIVEKEY='tmg3d_live_v1';     // LIVE world save — a separate world holding ONLY wallet-backed state
+const MODEKEY='tmg3d_mode';        // which world to boot into next visit
+const keyForMode=m=>m==='live'?LIVEKEY:SAVEKEY;
 const now=()=>Date.now();
 let S=null;
 function freshState(){ const inv={},bought={2:0,17:0,18:0,19:0,23:0}; INV_IDS.forEach(i=>{inv[i]=0;bought[i]=0;}); return {
@@ -629,8 +632,14 @@ function freshState(){ const inv={},bought={2:0,17:0,18:0,19:0,23:0}; INV_IDS.fo
   pool:{pol:'nucash',alt:'nucash',wtx:'genesis'}, myPools:{}, pend:{pol:0,alt:0,wtx:0}, payThresh:3,
   shares:0, burned:0, altH:6998800, altHybrid:0, altNodes:0, altLocked:0, valEarn:0, poolEarnW:0, poolEarnC:{pol:0,alt:0,wtx:0},
 };}
-function save(){ if(!S) return; S.lastSeen=now(); try{localStorage.setItem(SAVEKEY,JSON.stringify(S));}catch(e){} }
-function load(){ try{ const r=localStorage.getItem(SAVEKEY); if(r){ const o=JSON.parse(r); if(o&&o.rigs){
+/* LIVE world: starts EMPTY — no free demo WATT, no sim rigs. Inventory and
+   rigs mirror the connected wallet (w3GrantOwned); the HUD coin rows read the
+   wallet's real balances (W3.live). Demo progress never leaks in. */
+function freshLiveState(){ const st=freshState(); st.mode='live'; st.watt=0; st.shopPool=0; return st; }
+function save(){ if(!S) return; S.lastSeen=now();
+  try{ localStorage.setItem(keyForMode(S.mode),JSON.stringify(S)); localStorage.setItem(MODEKEY,S.mode); }catch(e){} }
+function load(mode){ mode=mode==='live'?'live':'demo';
+  try{ const r=localStorage.getItem(keyForMode(mode)); if(r){ const o=JSON.parse(r); if(o&&o.rigs){
   const f=freshState();
   const inv=Object.assign({},f.inv,o.inv||{}), bought=Object.assign({},f.bought,o.bought||{});
   const st=Object.assign(f,o);
@@ -644,6 +653,9 @@ function load(){ try{ const r=localStorage.getItem(SAVEKEY); if(r){ const o=JSON
   st.myPools=o.myPools||{}; st.pend=Object.assign({pol:0,alt:0,wtx:0},o.pend||{});
   for(const c of ['pol','alt','wtx']) if(st.pool[c]==='solo'&&!st.myPools[c]) st.pool[c]=c==='wtx'?'genesis':'nucash';
   st.poolEarnC=Object.assign({pol:0,alt:0,wtx:0},o.poolEarnC||{});
+  /* the slot decides the mode — a pre-split save that stored mode:'live' in the
+     demo slot must NOT drag demo rigs/balances into the live world */
+  st.mode=mode;
   return st; } } }catch(e){} return null; }
 /* number formatting */
 function fmt(n){ n=Number(n)||0; const a=Math.abs(n);
@@ -1060,6 +1072,12 @@ function buildFarm(){
       pad.rotation.x=-Math.PI/2; pad.position.set(0,0.01,27); scene.add(pad); farmG.pads[1]=pad; }
     farmG.warehouse=makeWarehouse();
   }
+  // farm can also SHRINK now (demo/live are separate worlds) — structures are
+  // kept but hidden when the loaded state doesn't own them
+  farmG.containers.forEach((c,i)=>{ c.visible=i<S.containers; });
+  if(farmG.warehouse) farmG.warehouse.visible=!!S.warehouse;
+  if(farmG.pads[0]) farmG.pads[0].visible=S.containers>0;
+  if(farmG.pads[1]) farmG.pads[1].visible=!!S.warehouse;
   // widen the world as the farm grows
   const far=S.warehouse?46:S.containers?38:24;
   controls.maxDistance=far; scene.fog.far=S.warehouse?95:S.containers?75:40;
@@ -2067,7 +2085,15 @@ function curPay(cur,amt){
 }
 function buyItem(id){
   const it=ITEMS[id];
-  if(id===1){ if(mintPC(S.pcCount===0)) renderShop(); return; }
+  if(id===1){
+    /* LIVE: the Gaming PC is a REAL free mint (CaseFreeMint, one per wallet) —
+       never a sim rig, or the desk would have no NFT behind it */
+    if(typeof isLive==='function' && isLive()){
+      if(typeof ocFreeMintPC==='function' && W3.addr) ocFreeMintPC();
+      else toast('Connect a wallet (🦊) on Polygon or Altcoinchain to claim the free Gaming PC','gold',9000);
+      return;
+    }
+    if(mintPC(S.pcCount===0)) renderShop(); return; }
   /* LIVE mode: buy the item as a REAL NFT through the on-chain ItemShop instead
      of the sim shop. ocBuyItem handles payment (WATT→staking pool, or native at
      WATT value→treasury), mint, and messaging; the sim inventory is untouched. */
@@ -2164,6 +2190,7 @@ const WEB3CFG={
       nft:'0x0CDbf4926a8EdFFaa803B96f8fa90B065DE19Eb2', watt:'0x387693eCEC037C61943404F03c097d2ADA15ae3f', staking:'0x856f59F1729f6e107EbCD75d21c64AB897c5681f',
       shop:'0xeE6B67c3993884F1b693A4a66e952Bb563463131', mg:'0x856f59F1729f6e107EbCD75d21c64AB897c5681f', vault:'0x72A716F62aCfF960f6F097B4c7909B2368eD3acA', migrator:'0x97BcC99ff34FA2cde929c97074011E8929F59679',
       classicNft:'0x970a8b10147e3459d3cbf56329b76ac18d329728', oldWatt:'0xE960d5076cd3169C343Ee287A2c3380A222e5839',
+      freeMint:'0xc75504Cb57b26041655dDd739414C240Dd628e7a', /* CaseFreeMint — free Gaming PC (id 1), one per wallet, open since 2026-08-24 */
       nftV2:null, wattV2:null,
       /* pools: V3 multi-coin set (WATT v2 stake, coin-menu pools) — deployed +
          verified 2026-08-25 (deployments-pools-v3-137.json). rigNft + staking
@@ -2182,6 +2209,7 @@ const WEB3CFG={
       nft:'0x851fd0205348783444Fc9EDe99Ca2321681EC99b', watt:'0xB7635E386283CAE6FB1A710f19CaA8220beF630D', staking:'0x856f59F1729f6e107EbCD75d21c64AB897c5681f',
       shop:'0x92809C4a46b4D0F11a48BE21fF13202EA56DcEB1', mg:'0x856f59F1729f6e107EbCD75d21c64AB897c5681f', vault:'0x72A716F62aCfF960f6F097B4c7909B2368eD3acA', migrator:'0x97BcC99ff34FA2cde929c97074011E8929F59679',
       classicNft:'0xf9670e5D46834561813CA79854B3d7147BBbFfb2', oldWatt:'0x6645143e49B3a15d8F205658903a55E520444698',
+      freeMint:'0x91Ae9eDe6016AdF84c643F9Ce5Bb60A9438D792f', /* CaseFreeMint — free Gaming PC (id 1), one per wallet, open since 2026-08-23 */
       nftV2:null, wattV2:null,
       /* pools: V3 multi-coin set (WATT v2 stake, coin-menu pools) — deployed +
          verified 2026-08-25 (deployments-pools-v3-2330.json). Hosts can lock
@@ -2356,8 +2384,10 @@ function w3GrantOwned(){
     if(r.frame) inst[14]=(inst[14]||0)+1;
     for(const g of r.gpus) inst[g]=(inst[g]||0)+1;
   }
-  // Gaming PC → ensure a rig exists if you own one on-chain
-  if((W3.nfts[1]||0)>0 && S.rigs.length===0) mintPC(true);
+  // Gaming PC → one desk rig per PC you own on-chain (live rigs only — live
+  // mode is its own world, so demo desks can no longer absorb these)
+  const pcs=W3.nfts[1]||0;
+  while(S.rigs.length<pcs && mintPC(true)){}
   // Genesis Badge
   if((W3.nfts[2]||0)>0 && !S.badge){ S.badge=1; setBadgeOwned(true); }
   // every other component: set inventory to (owned − installed)
@@ -2718,14 +2748,32 @@ async function poolEthers(){ if(!_E6) _E6=import('https://cdn.jsdelivr.net/npm/e
    real DEX pools, earning reflects real rewards (validator wiring lands in a later
    pass), on-chain pool hosting. Live requires a wallet on a supported chain. */
 function isLive(){ return S && S.mode==='live'; }
+/* DEMO and LIVE are SEPARATE WORLDS with separate saves. Switching stashes the
+   world you leave and loads (or creates) the other: live starts empty and is
+   filled from the wallet, so demo rigs/balances never show in live and demo
+   desks can never absorb your real on-chain components. */
 function setMode(m){
-  S.mode=m; SFX.swap();
-  if(m==='live'&&!W3.addr){ toast('🔗 LIVE MODE — connect a wallet (🦊) to sell into real pools and mine on-chain','gold',9000); }
-  else toast(m==='live'?'🔗 LIVE MODE — sells are REAL swaps into on-chain WATT pools':'🎮 DEMO MODE — simulated economy, nothing on-chain','cyan',7000);
+  if(!S||S.mode===m) return;
+  save();                                              // stash the world we're leaving
+  S=load(m)||(m==='live'?freshLiveState():freshState());
+  SFX.swap();
+  /* rebuild the 3D world from the new state */
+  if(typeof closeBench==='function'&&benchOpen) closeBench();
+  setBadgeOwned(!!S.badge); setTowerOwned(!!S.tower);
+  rebuildAllRigs(); buildFarm(); refreshRings();
+  selRig=-1; renderRigPanel&&renderRigPanel();
+  if(m==='live'&&!W3.addr){ toast('🔗 LIVE MODE — connect a wallet (🦊): your NFTs become your rigs, balances and pools are real','gold',9000); }
+  else toast(m==='live'?'🔗 LIVE MODE — your wallet IS the game: real NFTs, real balances, real on-chain pools':'🎮 DEMO MODE — simulated economy, nothing on-chain','cyan',7000);
+  if(m==='live'&&W3.addr) w3Refresh().catch(()=>{});    // mirror wallet NFTs -> rigs + inventory
   renderHud&&renderHud(); if($('m-pool')&&$('m-pool').classList.contains('open')) renderPoolHub();
-  if($('m-web3')&&$('m-web3').classList.contains('open')) renderWallet(); save();
+  if($('m-web3')&&$('m-web3').classList.contains('open')) renderWallet();
+  if($('m-shop')&&$('m-shop').classList.contains('open')&&typeof renderShop==='function') renderShop();
+  save();
 }
 function toggleMode(){ setMode(isLive()?'demo':'live'); }
+/* the wallet panel's DEMO/LIVE buttons are inline onclick= handlers, which
+   resolve against window — without this they were dead in the module build */
+window.setMode=setMode; window.toggleMode=toggleMode;
 
 /* ===== WTX -> WATT via the live bridge desk (bridge.wattxchange.app) ===== */
 const WATT_BRIDGE_API='https://bridge.wattxchange.app';
@@ -3080,6 +3128,24 @@ async function ocBuyItem(id){
   return true;
 }
 
+/* LIVE free Gaming PC: the real CaseFreeMint contract — mint(proof) with an
+   empty proof while the mint is open to all; one per wallet forever. The desk
+   appears via w3GrantOwned as soon as the wallet re-syncs. */
+async function ocFreeMintPC(){
+  const c=ecoCfg();
+  if(!c||!c.freeMint){ SFX.err(); toast('Free Gaming PC mint lives on Polygon and Altcoinchain — switch your wallet there','gold',9000); return; }
+  try{
+    const E=await poolEthers();
+    const prov=new E.BrowserProvider(w3Eth()); const signer=await prov.getSigner();
+    const fm=new E.Contract(c.freeMint,['function mint(bytes32[] proof)','function freeMinted(address) view returns (bool)'],signer);
+    if(await fm.freeMinted(W3.addr).catch(()=>false)){ SFX.err(); toast('This wallet already claimed its free Gaming PC — one per wallet, forever','gold',9000); return; }
+    toast('⛓ Claiming your FREE Gaming PC on '+c.name+' — you pay only gas…','gold',9000);
+    await (await fm.mint([])).wait();
+    SFX.mint(); toast('⛓ FREE Gaming PC minted — your desk appears as the wallet syncs','gold',12000);
+    w3Refresh&&w3Refresh();
+  }catch(e){ SFX.err(); toast('free mint failed: '+(''+(e&&(e.reason||e.message)||e)).slice(0,90),'red',9000); }
+}
+
 /* CLAIM RIG — turn the classic Mining Game NFTs you already own (ERC-1155
    components) into an engine-compatible rig via the RigClaimMigrator. Escrows
    your components (reclaim anytime by returning the rig). */
@@ -3285,7 +3351,14 @@ async function fillChainPools(){
 /* ---------- Pool Hub UI ---------- */
 function renderPoolHub(){
   const coin=CFG.nets[S.net].coin, sym=CFG.nets[S.net].sym, mine=S.myPools[coin];
-  const rows=POOLS[coin].map(p=>{
+  /* LIVE: the fictional demo pools (PolyHash, MaticWorks…) are sim-only. The
+     available pools are the REAL registry pools read from the chain — they
+     render in the ⛓ REAL ON-CHAIN POOLS box (fillChainPools), which also
+     carries hosting, rig staking and per-rig MINE. */
+  const live=isLive();
+  const rows=live?`<div class="prow"><div class="pi"><b>⛓ LIVE — real pools only</b>
+      <small>The pools above are read straight from the on-chain PoolRegistry — anyone who locks 100k ⚡WATT appears there automatically. Demo pools are hidden in live mode.</small></div></div>`
+    :POOLS[coin].map(p=>{
     const sel=S.pool[coin]===p.id;
     const soloLocked=p.solo&&!mine;
     return `<div class="prow ${sel?'sel':''}${p.official?' off':''}">
@@ -3294,7 +3367,7 @@ function renderPoolHub(){
       <div class="pf">x${p.speed}<small>payout freq</small></div>
       <button class="hbtn ${sel?'':'accent'}" data-join="${p.id}" ${sel?'disabled':''}>${sel?'CONNECTED':soloLocked?'🔒 JOIN':'JOIN'}</button></div>`;
   }).join('');
-  const mineRow = mine?`<div class="prow sel host">
+  const mineRow = live?'':mine?`<div class="prow sel host">
       <div class="pi"><b>${mine.solo?'⛏':'🏊'} ${mine.name}</b><small>${mine.solo?'YOUR private node · solo mining · power-free':'YOUR pool · fee '+(mine.fee*100).toFixed(1)+'% · NPC hashrate '+fmtInt(mine.npc||0)+' H'}</small></div>
       ${mine.solo?'':`<div class="pf">+${fmt(mine.earnC||0)}<small>${sym} earned</small></div>
       <div class="pf">+${fmt(mine.earnW||0)}<small>⚡ from burn</small></div>`}
@@ -3305,7 +3378,7 @@ function renderPoolHub(){
       <div class="rowbtns" style="margin-top:8px">FEE <input id="hostfee" type="range" min="0" max="12" value="3" step="0.5" style="flex:1"> <b id="hostfeev">3.0%</b>
       <button class="hbtn gold" id="hostgo">🏊 PUBLIC POOL</button>
       <button class="hbtn accent" id="hostsolo">⛏ PRIVATE NODE</button></div></div>`;
-  const alt=`<div class="valbox"><b>⛓ ALTCOINCHAIN HYBRID PoS ${S.altHybrid?'<span style="color:var(--grn)">— LIVE</span>':''}</b>
+  const alt=live?'':`<div class="valbox"><b>⛓ ALTCOINCHAIN HYBRID PoS ${S.altHybrid?'<span style="color:var(--grn)">— LIVE</span>':''}</b>
       <small>height <b>${fmtInt(S.altH)}</b> / 7.00M ${S.altHybrid?'· reward split 1/1 miners : stakers':'· hybrid fork at block 7,000,000'}</small>
       ${S.altHybrid?`<div class="rowbtns" style="margin-top:8px">
         <span>🛰 nodes: <b>${S.altNodes}</b> · locked <b>${fmt(S.altLocked)} ALT</b> · earned <b>${fmt(S.valEarn)} ALT</b></span>
@@ -3505,7 +3578,9 @@ function renderShop(){
   [1,3,4,5,14,2].forEach(id=>shopCard(el,id,false));
   head('🖱 BATTLESTATION · permanent luck, survives prestige');
   [17,18,23].forEach(id=>shopCard(el,id,false));
-  const locked=S.gen<2;
+  /* Gen prestige is a SIM mechanic — in live mode the on-chain shop sells every
+     item, so gen2 hardware is never locked there */
+  const locked=S.gen<2 && !(typeof isLive==='function'&&isLive());
   head(`🚀 GEN 2 HARDWARE ${locked?'· <span style="color:var(--red)">locked — reach GENERATION 2 in 🔧 GARAGE</span>':'· unlocked'}`);
   [8,9,10,12,11,13,19].forEach(id=>shopCard(el,id,locked));
   el.querySelectorAll('[data-buy]').forEach(b=>b.onclick=()=>buyItem(+b.dataset.buy));
@@ -4167,7 +4242,7 @@ $('net').onclick=switchNet;
 $('sell-pol').onclick=()=>sellCoin('pol');
 $('sell-alt').onclick=()=>sellCoin('alt');
 $('b-share').onclick=shareX;
-$('b-reset').onclick=()=>{ if(confirm('Wipe your entire garage and start over?')){ localStorage.removeItem(SAVEKEY); location.reload(); } };
+$('b-reset').onclick=()=>{ if(confirm('Wipe your entire garage and start over? (only the '+(S&&S.mode==='live'?'LIVE':'DEMO')+' world is wiped)')){ localStorage.removeItem(keyForMode(S?S.mode:'demo')); location.reload(); } };
 $('b-wallet').onclick=()=>{ openModal('m-web3'); renderWallet(); if(w3Has()&&!W3.addr) w3Connect(); };
 $('bench-close').onclick=()=>closeBench();
 $('bench-shop').onclick=()=>{ openModal('m-shop'); renderShop(); };
@@ -4381,17 +4456,22 @@ async function init(){
     await loadModels(p=>{ note.textContent=`loading 3D hardware… ${Math.round(p*100)}%`; });
   }catch(e){ note.textContent='model load failed — check connection & refresh'; console.error(e); return; }
   makeThumbs(); buildPosters(); buildBadgeDisplay();
-  const saved=load();
+  let bootMode='demo'; try{ if(localStorage.getItem(MODEKEY)==='live') bootMode='live'; }catch(e){}
+  const saved=load(bootMode)||(bootMode==='live'?freshLiveState():null);
   if(saved){ S=saved;
     $('mintbtn').textContent='⛏ RESUME MINING';
-    note.textContent=`welcome back — ${saved.rigs.length} rig(s) · ${fmt(saved.watt)} ⚡WATT`;
+    note.textContent=`welcome back — ${saved.mode==='live'?'🔗 LIVE · ':''}${saved.rigs.length} rig(s) · ${fmt(saved.watt)} ⚡WATT`;
   } else note.textContent='ready';
   $('mintbtn').onclick=()=>{
     $('splash').style.display='none';
     if(!S){ S=freshState(); }
     auInit(); setMuted(S.muted);
     setBadgeOwned(!!S.badge); setTowerOwned(!!S.tower);
-    if(S.rigs.length===0){ mintPC(true); S.tut=0; showTut(); }
+    if(S.mode==='live'){ /* LIVE: rigs come from the wallet, never a demo mint */
+      rebuildAllRigs(); showTut();
+      if(!W3.addr) toast('🔗 LIVE MODE — connect your wallet (🦊) to load your NFTs, or switch to 🎮 DEMO in the wallet panel','gold',10000);
+    }
+    else if(S.rigs.length===0){ mintPC(true); S.tut=0; showTut(); }
     else { rebuildAllRigs(); applyOffline(); showTut(); }
     buildFarm(); refreshRings(); renderHud(); drawScreen(); save();
     running=true;
