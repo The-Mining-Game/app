@@ -85,6 +85,31 @@ article p{margin:0 0 17px;color:#d7d2f2}
 article p strong{color:var(--txt)}
 article a{overflow-wrap:anywhere}
 
+/* ---- roadmap ---- */
+.phase{margin:0 0 16px;padding:16px 18px;border:1px solid var(--line);border-radius:14px;background:var(--panel)}
+.phase.done{border-color:rgba(61,255,138,.30)}
+.phase.live{border-color:rgba(46,230,214,.36)}
+.phase .ph{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.phase .ph b{font-size:15.5px;letter-spacing:.05em;color:var(--txt)}
+.phase .when{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)}
+.pill{margin-left:auto;font-size:10px;font-weight:800;letter-spacing:.13em;text-transform:uppercase;
+  padding:4px 10px;border-radius:999px;border:1px solid;white-space:nowrap}
+.pill.done{color:var(--grn);border-color:rgba(61,255,138,.45);background:rgba(61,255,138,.09)}
+.pill.part{color:var(--gold);border-color:rgba(255,210,63,.45);background:rgba(255,210,63,.09)}
+.pill.live{color:var(--cyan);border-color:rgba(46,230,214,.45);background:rgba(46,230,214,.09)}
+.pill.next{color:var(--dim);border-color:var(--line);background:rgba(130,71,229,.10)}
+.phase .lede{margin:9px 0 0;font-size:14.5px;color:var(--dim)}
+.phase ul{list-style:none;margin:11px 0 0;padding:0;display:flex;flex-direction:column;gap:7px}
+.phase li{position:relative;padding-left:25px;color:#d7d2f2;font-size:15px;line-height:1.58}
+.phase li::before{position:absolute;left:0;top:0;font-size:13px;line-height:1.65}
+.phase li.y::before{content:"\2714";color:var(--grn)}
+.phase li.p::before{content:"\25D0";color:var(--gold)}
+.phase li.n::before{content:"\25FB";color:var(--dim)}
+.gap{margin:0 0 16px;padding:14px 18px;border-left:3px solid var(--pur);
+  background:rgba(130,71,229,.09);border-radius:0 12px 12px 0;color:var(--dim);font-size:14.5px}
+.gap b{color:var(--txt)}
+p.rmnote{margin-top:18px;font-size:13.5px;color:var(--dim)}
+
 /* mobile */
 @media(max-width:860px){
   .wrap{grid-template-columns:1fr;gap:0}
@@ -150,9 +175,9 @@ footer .sp{margin-left:auto}
 <h2 id="introduction">Introduction</h2>
 <p><a href="https://mining-game.wattxchange.app" target="_blank" rel="noopener">Mining game</a> is a Free 2 play, Play 2 Earn and Learn 2 Earn crypto mining simulator game centered around the history of cryptocurrencies, replacing power-hungry mining hardware with NFTs.</p>
 <p><br><em><strong>WATT v1</strong></em> (old WATT contracts)</p>
-<p><a href="https://mining-game.wattxchange.app" target="_blank" rel="noopener">The Crypto Mining Game</a>’s v1 contract address to the emissions token contract on Polygon is <a href="https://polygonscan.com/token/0xe960d5076cd3169c343ee287a2c3380a222e5839" target="_blank" rel="noopener">WATT v1</a>, which had its <a href="https://polygonscan.com/tx/0xbbdaf525303a88a947619d80e05d979ff5a9c8f5f7825d1fc53e24502a774bc8" target="_blank" rel="noopener">genesis block</a> on May 1st, 2022 when 300,000 WATT were minted into existence from the Mining Game Deployer contract; <a href="https://expedition.altcoinchain.org/address/0x6645143e49B3a15d8F205658903a55E520444698?network=Altcoinchain" target="_blank" rel="noopener">WATT v1</a> is the contract on Altcoinchain. The Mining Game Started as an idea for the world to learn about mining cryptocurrency using the Proof of Work consensus, only without the requirements of costly computer hardware and electricity.<br><br><em><strong>WATT v2 </strong></em>(current WATT contracts)<br><a href="https://polygonscan.com/address/0x387693ecec037c61943404f03c097d2ada15ae3f" target="_blank" rel="noopener">WATT v2 on Polygon</a> and <a href="https://alt-exp.wattxchange.app/token/0xb7635e386283cae6fb1a710f19caa8220bef630d" target="_blank" rel="noopener">WATT v2 on Altcoinchain</a> are the current contracts for the 3D interactive mining game. <a href="https://polygonscan.com/token/0xe960d5076cd3169c343ee287a2c3380a222e5839" target="_blank" rel="noopener">WATT v1</a> can be purchased and migrated for <a href="https://polygonscan.com/address/0x387693ecec037c61943404f03c097d2ada15ae3f" target="_blank" rel="noopener">WATT v2</a> at the <a href="https://stake.mining-game.wattxchange.app/swap.html" target="_blank" rel="noopener">WATT v1 to V2 migration</a> dApp. The current contract has crosschain swap features where tokens are taken out of circulation on one chain when bridged to another chain, and WATT is also used as energy in mining with NFT mining rig configurations in the mining game while mining real hybrid PoW/PoS blockchains through validators nodes that act as a stratum mining pool which pays out to miners on chain.</p>
+<p><a href="https://mining-game.wattxchange.app" target="_blank" rel="noopener">The Crypto Mining Game</a>’s v1 contract address to the emissions token contract on Polygon is <a href="https://polygonscan.com/token/0xe960d5076cd3169c343ee287a2c3380a222e5839" target="_blank" rel="noopener">WATT v1</a>, which had its <a href="https://polygonscan.com/tx/0xbbdaf525303a88a947619d80e05d979ff5a9c8f5f7825d1fc53e24502a774bc8" target="_blank" rel="noopener">genesis block</a> on May 1st, 2022 when 300,000 WATT were minted into existence from the Mining Game Deployer contract; <a href="https://alt-exp.wattxchange.app/address/0x6645143e49B3a15d8F205658903a55E520444698" target="_blank" rel="noopener">WATT v1</a> is the contract on Altcoinchain. The Mining Game Started as an idea for the world to learn about mining cryptocurrency using the Proof of Work consensus, only without the requirements of costly computer hardware and electricity.<br><br><em><strong>WATT v2 </strong></em>(current WATT contracts)<br><a href="https://polygonscan.com/address/0x387693ecec037c61943404f03c097d2ada15ae3f" target="_blank" rel="noopener">WATT v2 on Polygon</a> and <a href="https://alt-exp.wattxchange.app/token/0xb7635e386283cae6fb1a710f19caa8220bef630d" target="_blank" rel="noopener">WATT v2 on Altcoinchain</a> are the current contracts for the 3D interactive mining game. <a href="https://polygonscan.com/token/0xe960d5076cd3169c343ee287a2c3380a222e5839" target="_blank" rel="noopener">WATT v1</a> can be purchased and migrated for <a href="https://polygonscan.com/address/0x387693ecec037c61943404f03c097d2ada15ae3f" target="_blank" rel="noopener">WATT v2</a> at the <a href="https://stake.mining-game.wattxchange.app/swap.html" target="_blank" rel="noopener">WATT v1 to V2 migration</a> dApp. The current contract has crosschain swap features where tokens are taken out of circulation on one chain when bridged to another chain, and WATT is also used as energy in mining with NFT mining rig configurations in the mining game while mining real hybrid PoW/PoS blockchains through validators nodes that act as a stratum mining pool which pays out to miners on chain.</p>
 <h2 id="project-overview">Project Overview</h2>
-<p>The Mining Game Features 3D designed NFT art, representing computer hardware components with varying performance specs written into the code of their contract, which earn WATT when staked, with a halving of earnings to occur every 365 days. Mining Game hardware NFTs may be farmed within a mining rig configuration contract while using WATT to power the rigs at a daily rate according to their configuration in exchange for payouts in the Mining Game’s PoW coins, according to their virtual hardware input. WATT tokens used in mining are burned to the burn address (<a href="https://expedition.altcoinchain.org/address/0x000000000000000000000000000000000000dEaD?network=Altcoinchain" target="_blank" rel="noopener">0x000000000000000000000000000000000000dEaD</a>) when earnings are claimed from the mining contract. When their WATT balance for a mining rig reaches 0, the mining rig configuration will no longer earn PoW coins as if it were powered off. The miner may purchase more WATT and deposit it into the mining contract with their rig configuration to keep the rig mining or they may select to stake some or all of their hardware to earn more WATT, which they may claim daily. Alternatively, the miner could choose to host a mining pool on a local machine or VPS, which will enable their mining rig configuration to consume 0 WATT.</p>
+<p>The Mining Game Features 3D designed NFT art, representing computer hardware components with varying performance specs written into the code of their contract, which earn WATT when staked, with a halving of earnings to occur every 365 days. Mining Game hardware NFTs may be farmed within a mining rig configuration contract while using WATT to power the rigs at a daily rate according to their configuration in exchange for payouts in the Mining Game’s PoW coins, according to their virtual hardware input. WATT tokens used in mining are burned to the burn address (<a href="https://alt-exp.wattxchange.app/address/0x000000000000000000000000000000000000dEaD" target="_blank" rel="noopener">0x000000000000000000000000000000000000dEaD</a>) when earnings are claimed from the mining contract. When their WATT balance for a mining rig reaches 0, the mining rig configuration will no longer earn PoW coins as if it were powered off. The miner may purchase more WATT and deposit it into the mining contract with their rig configuration to keep the rig mining or they may select to stake some or all of their hardware to earn more WATT, which they may claim daily. Alternatively, the miner could choose to host a mining pool on a local machine or VPS, which will enable their mining rig configuration to consume 0 WATT.</p>
 <p>Users with excess WATT may sell to the market or hold for later use or even add it to and remove it from a liquidity pool of their choice. With WATT being at the center of the Mining Game economy, it will help decentralize actual PoW at-home miner&#x27;s power costs if they also have a stake in The Mining Game. Users could sell their profits and re-invest back into their own costs for hardware mining.</p>
 <h2 id="tokenomics-and-economic-model">Tokenomics and Economic Model</h2>
 <p>The mining game started with a <em>FREE MINT GAMING PC NFT</em> and 300,000 WATT minted into supply and a <em>GENESIS BADGE</em> to all testnet junkies. Each NFT component has a variable WATT emission rate for staking and halving every year. New hardware NFTs and mining configurations will be added annually. Miners will earn their share based off of hardware input / network hashrate while their hardware drains WATT from the mining contract which is deposited to the burn address when mining rewards are claimed.</p>
@@ -166,7 +191,114 @@ footer .sp{margin-left:auto}
 <h2 id="gameplay-and-user-experience">Gameplay and User Experience</h2>
 <p>Participants are incentivised for participation within the protocol for staking their NFTs to earn WATT, for running mining rig configurations with their NFTs in exchange for the PoW coin, for hosting nodes to secure both of the blockchains and the option to support the cross-chain bridge mechanism via hosting a node, which has an amount of coin and wrapped token locked into liquidity for real-time bridging between wrapped tokenized versions and native blockchain coins, at a fee set by the holder. The value of tokens in the protocol and the PoW coins produced by miners is purely speculative, depending on supply and demand of the markets.</p>
 <h2 id="roadmap-and-future-developments">Roadmap and Future Developments</h2>
-<p>The Roadmap of The Mining Game may be found here: <a href="https://mining.game/roadmap/" target="_blank" rel="noopener">The Mining Game Roadmap</a></p>
+<p>The original roadmap was published in 2022 as four phases running from Q2 2022 to Q1 2023. Phases 1 and 2 shipped largely on schedule. The remaining phases stalled when development paused through 2023 and 2024 following the illness and passing of the project&#x27;s lead developer. Work resumed in 2025, and everything the original roadmap set out has since been built — in most cases considerably beyond what was scoped. What follows is the original roadmap with its real outcome, and then the work that has landed since. Dates given are the dates the work shipped, not projections.</p>
+
+<div class="phase done">
+  <div class="ph"><b>Phase 1 &mdash; Foundation</b><span class="when">Q2 2022</span><span class="pill done">Complete</span></div>
+  <ul>
+    <li class="y">Twitter account and Discord server</li>
+    <li class="y">Free Gaming PC NFT, Genesis Badge and the first upgrade components designed</li>
+    <li class="y">NFT contract deployed and tested on testnet, then migrated to Polygon mainnet</li>
+    <li class="y">Website deployed</li>
+    <li class="y">NFT launch &mdash; free mint and sale</li>
+    <li class="y">WATT token deployed; 300,000 WATT minted from the Mining Game Deployer on 1 May 2022</li>
+    <li class="y">NFT staking contract and UI, WATT staking, and WATT&ndash;MATIC LP staking</li>
+  </ul>
+</div>
+
+<div class="phase">
+  <div class="ph"><b>Phase 2 &mdash; Expansion</b><span class="when">Q3 2022</span><span class="pill part">Partial</span></div>
+  <ul>
+    <li class="y">Further component NFTs designed &mdash; the Kirtex XL1 CPU, MAD GP50 GPU, Oblivia TX120 GPU and the rest of the generation-one catalogue</li>
+    <li class="y">Explore multichain &mdash; the full NFT, WATT and staking stack was deployed to <a href="https://altcoinchain.org" target="_blank" rel="noopener">Altcoinchain</a> alongside Polygon</li>
+    <li class="n">Blueprint NFTs and the blueprint minting contract &mdash; deferred</li>
+    <li class="n">Marketplace and public listing &mdash; deferred</li>
+    <li class="n">WATT-DAO &mdash; deferred, see <a href="#community-engagement-and-feedback">Community Engagement and Feedback</a></li>
+    <li class="n">Learn 2 Earn &mdash; deferred</li>
+  </ul>
+</div>
+
+<div class="phase">
+  <div class="ph"><b>Phases 3 &amp; 4 &mdash; the original targets</b><span class="when">Q4 2022 &ndash; Q1 2023</span><span class="pill part">Carried forward</span></div>
+  <p class="lede">These phases were not delivered on the original timeline. Every goal in them was carried forward and has since been met or superseded by the work in Phases 5 to 8.</p>
+  <ul>
+    <li class="y">Deploy and test the PoW token on testnet &mdash; delivered as the WATTx blockchain (Phase 6)</li>
+    <li class="y">Deploy and test the mining contract on testnet &mdash; delivered as the on-chain pool registry, payout hub and node mining engine (Phase 7)</li>
+    <li class="y">Develop the game UI &mdash; delivered as the 3D game (Phase 8)</li>
+    <li class="y">Game launch &mdash; the 3D Mining Game is live (Phase 8)</li>
+    <li class="y">Conceptualise mining pools &mdash; built and running (Phase 7)</li>
+    <li class="p">Conceptualise metaverse integration &mdash; the 3D game shipped; the shared multiplayer lounge is in development</li>
+    <li class="p">Migrate the PoW token and mining to mainnet &mdash; running on testnet and the public pool; mainnet rollout is Phase 9</li>
+    <li class="n">Implement Learn 2 Earn &mdash; still outstanding, carried into Phase 9</li>
+    <li class="n">Migrate Blueprint minting to mainnet &mdash; still outstanding, carried into Phase 9</li>
+  </ul>
+</div>
+
+<p class="gap"><b>2023 &ndash; 2024 &mdash; development paused.</b> The contracts stayed live and staking kept paying out throughout, but no new work shipped in this period.</p>
+
+<div class="phase done">
+  <div class="ph"><b>Phase 5 &mdash; WATT v2 and cross-chain</b><span class="when">2025 &ndash; 2026</span><span class="pill done">Complete</span></div>
+  <ul>
+    <li class="y">WATT v2 deployed on <a href="https://polygonscan.com/address/0x387693ecec037c61943404f03c097d2ada15ae3f" target="_blank" rel="noopener">Polygon</a> and <a href="https://alt-exp.wattxchange.app/token/0xb7635e386283cae6fb1a710f19caa8220bef630d" target="_blank" rel="noopener">Altcoinchain</a>, replacing v1 as the live game token</li>
+    <li class="y">A <a href="https://stake.mining-game.wattxchange.app/swap.html" target="_blank" rel="noopener">v1 &rarr; v2 migration dApp</a>, open to anyone holding or buying v1</li>
+    <li class="y">Cross-chain WATT: supply is taken out of circulation on the source chain and reissued on the destination chain, so one supply spans every chain</li>
+    <li class="y">Altcoinchain infrastructure rebuilt and hosted &mdash; public RPC, block explorer and a bridge desk</li>
+    <li class="y">SwapinDEX liquidity on Altcoinchain, including wrapped mainnet coins paired against WATT</li>
+    <li class="y">The <a href="https://wattxchange.app/#/mining" target="_blank" rel="noopener">WATTxchange dApp</a> &mdash; wallet, DEX, bridge, explorer, pool hub, validators and the Mining Game in one interface</li>
+  </ul>
+</div>
+
+<div class="phase done">
+  <div class="ph"><b>Phase 6 &mdash; the Proof-of-Work coin</b><span class="when">2025 &ndash; 2026</span><span class="pill done">Complete</span></div>
+  <p class="lede">The roadmap&#x27;s &ldquo;deploy the PoW token and mining contract&rdquo; became a blockchain in its own right rather than a token on someone else&#x27;s chain.</p>
+  <ul>
+    <li class="y">WATTx Core &mdash; a hybrid Proof-of-Work / Proof-of-Stake chain carrying an EVM layer, so game contracts can live on the same chain the miners secure</li>
+    <li class="y">X25X multi-algorithm mining: SHA256d, Scrypt, Ethash, RandomX, Equihash, X11 and kHeavyHash, so any class of hardware &mdash; and any Mining Game rig configuration &mdash; has an algorithm to point at</li>
+    <li class="y">120-second target block time, 5 WATTx per block, halving every 1,051,200 blocks (roughly four years), with stake maturity halving alongside the reward</li>
+    <li class="y">Proof-of-Stake difficulty and block-reward corrections shipped as a hard fork</li>
+    <li class="y">Privacy layer completed May 2026 &mdash; ring signatures, stealth addresses, confidential transactions and full-chain membership proofs, with view keys and anonymous send and receive in the wallet</li>
+    <li class="y">Version 0.1.7.2 tagged and released with binaries &mdash; February 2026</li>
+  </ul>
+</div>
+
+<div class="phase done">
+  <div class="ph"><b>Phase 7 &mdash; merged mining and the pool network</b><span class="when">2026</span><span class="pill done">Complete</span></div>
+  <ul>
+    <li class="y">AuxPoW merged mining: a single share can land a block on a parent chain <em>and</em> a WATTx block at the same time, so a miner earns on both</li>
+    <li class="y">All seven algorithms proven dual-earning against real parent daemons in July 2026 &mdash; Bitcoin (SHA256d), Litecoin (Scrypt), Monero (RandomX), Dash (X11), Altcoinchain (Ethash), BitcoinZ (Equihash) and Kaspa (kHeavyHash)</li>
+    <li class="y">A stratum server speaking the Bitcoin, XMRig, Ethash and Zcash wire protocols, with a payout-split coinbase that divides each block reward among the contributing miners by share</li>
+    <li class="y">Public mining pool live at pools.wattxchange.app</li>
+    <li class="y">On-chain pool registry, payout hub and node mining engine deployed on Altcoinchain &mdash; a host locks 100,000 WATT to register a pool, exactly as set out in <a href="#security-measures">Security Measures</a></li>
+    <li class="p">Distribution of the operators&#x27; share through the Pool-DAO token &mdash; in progress</li>
+  </ul>
+</div>
+
+<div class="phase live">
+  <div class="ph"><b>Phase 8 &mdash; game launch</b><span class="when">2026</span><span class="pill live">Live</span></div>
+  <ul>
+    <li class="y">The <a href="https://mining-game.wattxchange.app" target="_blank" rel="noopener">3D Mining Game</a> is live in the browser and installable as an app</li>
+    <li class="y">Build a rig from the real hardware NFTs &mdash; cases, CPUs, GPUs, ASICs and the Server Tower &mdash; at a workbench, with overclocking, heat and wear</li>
+    <li class="y">LIVE mode mirrors the NFTs held in your wallet into the 3D garage, one rig per NFT, scaling from desks to shipping containers to a warehouse as the farm grows</li>
+    <li class="y">An in-game operating system: wallet, DEX, pool hub and miner, plus a payout wallet that derives an address for every supported coin from a single seed phrase</li>
+    <li class="y"><a href="https://stake.mining-game.wattxchange.app/" target="_blank" rel="noopener">Staking dApp</a> for NFT staking, WATT claims and the v1 to v2 migration</li>
+    <li class="p">Shared multiplayer lounge &mdash; in development</li>
+  </ul>
+</div>
+
+<div class="phase">
+  <div class="ph"><b>Phase 9 &mdash; ahead</b><span class="when">2026 &ndash; 2027</span><span class="pill next">Planned</span></div>
+  <ul>
+    <li class="n">WATT-DAO governance and the proposal forum described in <a href="#community-engagement-and-feedback">Community Engagement and Feedback</a></li>
+    <li class="n">Learn 2 Earn &mdash; the original goal, carried forward</li>
+    <li class="n">Marketplace with public listing, and the Blueprint NFTs</li>
+    <li class="n">Exchange and data-aggregator listings for WATT</li>
+    <li class="n">WATTx mainnet rollout &mdash; seed nodes, X25X activation and public pool onboarding</li>
+    <li class="n">Cross-chain privacy pools for shielded transfers between chains</li>
+    <li class="n">A new generation of hardware NFTs each year, raising network difficulty as the design always intended</li>
+  </ul>
+</div>
+
+<p class="rmnote">Note: goals are approximations. The roadmap is subject to change, especially the timeframe of these goals.</p>
 <h2 id="community-engagement-and-feedback">Community Engagement and Feedback</h2>
 <p>In an effort to decentralize decision making within the protocol, WATT-DAO will act as the voting mechanism within the Mining Game forum. Users with WATT staked in the DAO will have influence on future community voting power. Within the forum, DAO members may offer suggestions and/or improvements within the Mining Game ecosystem in an effort to further improve decentralization by voting with their stake using DAO tokens. DAO tokens are able to be be minted at a ratio of 100 WATT to 1 WATT-DAO, in which 100 WATT is burned with the WATT-DAO token each time a vote is cast and at a rate of 1,000 WATT for 10 WATT-DAO for the Mining Game Forum proposals.</p>
 <p>WATT-DAO proposals may have specific criteria to be met, according to the proposer’s specifications, before voting is finalized.</p>
@@ -174,22 +306,23 @@ footer .sp{margin-left:auto}
 <h2 id="references">References</h2>
 <p><em>Contract addresses</em>:</p>
 <p>Polygon WATT v1 contract address: <a href="https://polygonscan.com/token/0xe960d5076cd3169c343ee287a2c3380a222e5839" target="_blank" rel="noopener">0xe960d5076cd3169c343ee287a2c3380a222e5839</a></p>
-<p>Altcoinchain WATT v1  contract address: <a href="https://expedition.altcoinchain.org/address/0x6645143e49B3a15d8F205658903a55E520444698?network=Altcoinchain" target="_blank" rel="noopener">0x6645143e49B3a15d8F205658903a55E520444698</a><br><br>Polygon WATT v2 contract address: <a href="https://polygonscan.com/address/0x387693ecec037c61943404f03c097d2ada15ae3f" target="_blank" rel="noopener">0x387693ecec037c61943404f03c097d2ada15ae3f</a></p>
-<p>Altcoinchain WATT v1  contract address: <a href="https://alt-exp.wattxchange.app/token/0xb7635e386283cae6fb1a710f19caa8220bef630d" target="_blank" rel="noopener">0xb7635e386283cae6fb1a710f19caa8220bef630d</a></p>
+<p>Altcoinchain WATT v1 contract address: <a href="https://alt-exp.wattxchange.app/token/0x6645143e49B3a15d8F205658903a55E520444698" target="_blank" rel="noopener">0x6645143e49B3a15d8F205658903a55E520444698</a></p>
+<p>Polygon WATT v2 contract address: <a href="https://polygonscan.com/address/0x387693ecec037c61943404f03c097d2ada15ae3f" target="_blank" rel="noopener">0x387693ecec037c61943404f03c097d2ada15ae3f</a></p>
+<p>Altcoinchain WATT v2 contract address: <a href="https://alt-exp.wattxchange.app/token/0xb7635e386283cae6fb1a710f19caa8220bef630d" target="_blank" rel="noopener">0xb7635e386283cae6fb1a710f19caa8220bef630d</a></p>
 <p><a href="https://eips.ethereum.org/EIPS/eip-165" target="_blank" rel="noopener">ERC165 standard</a></p>
-<p><a href="https://mining.game/roadmap/" target="_blank" rel="noopener">The Mining Game Roadmap</a></p>
+<p><a href="#roadmap-and-future-developments">The Mining Game Roadmap</a> (published on mining.game in 2022; superseded by the roadmap in this document)</p>
 <p><a href="https://altcoinchain.org" target="_blank" rel="noopener">Altcoinchain.org</a></p>
 <p><a href="https://polygon.technology/" target="_blank" rel="noopener">Polygon.Technology</a></p>
-<p><a href="https://forum.mining.game" target="_blank" rel="noopener">Mining Game Forum</a></p>
-<p><a href="https://mining.game/faq/" target="_blank" rel="noopener">Mining Game F.A.Q.</a></p>
+<p>Mining Game Forum &mdash; the original forum.mining.game is retired; the WATT-DAO forum that replaces it is described under <a href="#community-engagement-and-feedback">Community Engagement and Feedback</a>.</p>
+<p><a href="https://web.archive.org/web/20250124110103/https://mining.game/faq/" target="_blank" rel="noopener">Mining Game F.A.Q.</a> (mining.game, archived)</p>
   </article>
 </div>
 
 <footer>
   <span>The Mining Game &middot; WATT</span>
-  <a href="https://mining.game/faq/" target="_blank" rel="noopener">F.A.Q.</a>
-  <a href="https://forum.mining.game" target="_blank" rel="noopener">Forum</a>
-  <a href="https://mining.game/roadmap/" target="_blank" rel="noopener">Roadmap</a>
+  <span>Updated 30 August 2026</span>
+  <a href="https://web.archive.org/web/20250124110103/https://mining.game/faq/" target="_blank" rel="noopener">F.A.Q.</a>
+  <a href="#roadmap-and-future-developments">Roadmap</a>
   <a href="https://wattxchange.app/#/mining" target="_blank" rel="noopener">WATTxchange</a>
   <span class="sp"><a href="./">Back to the game</a></span>
 </footer>
