@@ -2765,10 +2765,62 @@ function mgGenWallet(){
   return { address:mgEvmAddr(pk), privateKey:'0x'+mgHexB(priv) };
 }
 </script>
-<script type="importmap">{"imports":{
-  "three":"https://cdn.jsdelivr.net/npm/three@0.185.0/build/three.module.js",
-  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.185.0/examples/jsm/"
-}}</script>
+<script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1.10.0/dist/es-module-shims.js"></script>
+<script>
+/* Device compatibility (added for older phones, e.g. Galaxy Note 8 / Mali-G71 / Android 9).
+   three.js r163+ only runs on WebGL 2. Pick the newest three.js this device can run:
+   r185 with WebGL 2, r162 (the last release with WebGL 1) without it. Also shows a
+   readable message instead of a frozen screen when the browser cannot start the game
+   or the GPU drops the 3D context. */
+(function () {
+  var gl2 = false, gl1 = false;
+  try {
+    var c = document.createElement('canvas');
+    gl2 = !/[?&]webgl1\b/.test(location.search) && !!c.getContext('webgl2'); // ?webgl1 forces the fallback (testing)
+    if (!gl2) gl1 = !!(c.getContext('webgl') || c.getContext('experimental-webgl'));
+  } catch (e) {}
+  var v = gl2 ? '0.185.0' : '0.162.0';
+  window.__MG_THREE = v;
+  window.__MG_WEBGL = gl2 ? 2 : gl1 ? 1 : 0;
+  var map = document.createElement('script');
+  map.type = 'importmap';
+  map.textContent = JSON.stringify({ imports: {
+    three: 'https://cdn.jsdelivr.net/npm/three@' + v + '/build/three.module.js',
+    'three/addons/': 'https://cdn.jsdelivr.net/npm/three@' + v + '/examples/jsm/'
+  } });
+  document.currentScript.parentNode.insertBefore(map, document.currentScript.nextSibling);
+
+  function notice(title, body, retry) {
+    if (document.getElementById('mg-compat-notice')) return;
+    var d = document.createElement('div');
+    d.id = 'mg-compat-notice';
+    d.setAttribute('style', 'position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.88);color:#e2e8f0;font:15px/1.5 system-ui,sans-serif;padding:24px;text-align:center');
+    d.innerHTML = '<div style="max-width:420px"><div style="font-size:20px;font-weight:700;color:#facc15;margin-bottom:8px"></div><div></div>' +
+      (retry ? '<button style="margin-top:18px;background:#eab308;color:#000;border:0;border-radius:10px;padding:10px 22px;font-weight:600">Reload</button>' : '') + '</div>';
+    d.querySelector('div div').textContent = title;
+    d.querySelectorAll('div div')[1].textContent = body;
+    if (retry) d.querySelector('button').onclick = function () { location.reload(); };
+    (document.body || document.documentElement).appendChild(d);
+  }
+  if (!window.__MG_WEBGL) {
+    addEventListener('DOMContentLoaded', function () {
+      notice('3D graphics are turned off', 'This browser has WebGL disabled or unsupported. Update Chrome (or Samsung Internet), turn off battery saver / "reduce animations", or try another browser.', true);
+    });
+  }
+  var started = Date.now();
+  addEventListener('error', function (e) {
+    // Only the game's own scripts: wallet extensions inject code that throws here too.
+    var src = (e && e.filename) || '';
+    if (/^(chrome|moz|safari)-extension:|^$/.test(src)) return;
+    if (Date.now() - started < 20000 && e && e.message && !/ResizeObserver/.test(e.message)) {
+      notice('The game could not start', 'Your browser is too old for The Mining Game (' + e.message + '). Update Chrome or Samsung Internet, then reload.', true);
+    }
+  });
+  addEventListener('webglcontextlost', function () {
+    notice('Graphics paused', 'Your device ran out of graphics memory. Close other apps and reload the game.', true);
+  }, true);
+})();
+</script>
 <script type="module">
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
