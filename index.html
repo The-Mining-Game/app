@@ -229,6 +229,9 @@ button{font-family:inherit;cursor:pointer}
   box-shadow:inset 0 0 22px rgba(0,0,0,.4)}
 body.touch #joy{display:block}
 body.touch.walkoff #joy{display:none}
+/* phones: lift the Lounge pill above the walk joystick and let it size to its text */
+body.touch #net-ui{bottom:calc(146px + env(safe-area-inset-bottom))!important;width:auto!important;max-width:calc(100vw - 24px)!important}
+body.touch.walkoff #net-ui{bottom:12px!important}
 #joynub{position:absolute;left:50%;top:50%;width:50px;height:50px;margin:-25px 0 0 -25px;border-radius:50%;
   background:radial-gradient(circle at 38% 32%,#a879ff,#6a2ec7);box-shadow:0 5px 16px rgba(0,0,0,.55);
   border:1px solid rgba(255,255,255,.15);will-change:transform}
@@ -492,6 +495,10 @@ body.touch.walkoff #joy{display:none}
 <div class="modal" id="m-web3"><div class="mbox" style="max-width:520px">
   <div class="mhead"><h2>🦊 WALLET <small style="color:var(--dim);font-weight:400;font-size:11px">&nbsp;live contracts on Polygon &amp; Altcoinchain</small></h2><button class="x" data-close="m-web3">✕</button></div>
   <div id="w3-body"></div>
+</div></div>
+<div class="modal" id="m-wpick"><div class="mbox" style="max-width:400px">
+  <div class="mhead"><h2>🔗 SIGN IN <small style="color:var(--dim);font-weight:400;font-size:11px">&nbsp;LIVE mode uses your wallet</small></h2><button class="x" data-close="m-wpick">✕</button></div>
+  <div id="wpick-body"></div>
 </div></div>
 <div id="m-tx"></div>
 
@@ -3192,32 +3199,85 @@ function auInit(){
   AU.humG = AU.ctx.createGain(); AU.humG.gain.value=0.0;
   noise.connect(nf).connect(AU.humG); hum.connect(humF).connect(AU.humG);
   AU.humG.connect(AU.master); noise.start(); hum.start();
-  // --- ambient music: slow synth pad arpeggio ---
-  AU.musG = AU.ctx.createGain(); AU.musG.gain.value=0.12; AU.musG.connect(AU.master);
+  // --- music: procedural cypherpunk darksynth (see musicLoop) ---
+  AU.musG = AU.ctx.createGain(); AU.musG.gain.value=0.13; AU.musG.connect(AU.master);
+  // tempo-synced echo for the arp + glitch blips
+  AU.echo = AU.ctx.createDelay(1.5); AU.echo.delayTime.value = MUS.step()*3;
+  const efb = AU.ctx.createGain(); efb.gain.value=0.38;
+  const ewet = AU.ctx.createGain(); ewet.gain.value=0.32;
+  const ehp = AU.ctx.createBiquadFilter(); ehp.type='highpass'; ehp.frequency.value=500;
+  AU.echo.connect(efb).connect(ehp).connect(AU.echo); AU.echo.connect(ewet).connect(AU.musG);
+  // one shared noise buffer for hats / claps / glitches
+  const nb2 = AU.ctx.createBuffer(1, AU.ctx.sampleRate, AU.ctx.sampleRate);
+  const nd2 = nb2.getChannelData(0); for(let i=0;i<nd2.length;i++) nd2[i]=Math.random()*2-1;
+  AU.noise = nb2;
+  MUS.next = AU.ctx.currentTime + 0.1;
   musicLoop();
   AU.started=true;
 }
-const MUS = { seq:[0,3,7,10,12,10,7,3], root:[110,98,87.3,116.5], bar:0, t:null };
+/* Cypherpunk darksynth, generated live: 108 BPM, A-minor i–VI–VII–v (Am F G Em).
+   Rolling 16th sawtooth bass under a slow filter sweep, four-on-the-floor kick,
+   claps, offbeat hats, a detuned square arpeggio into a tempo echo, and the odd
+   "data packet" glitch. Each 16-step bar is scheduled ahead on the audio clock. */
+const MUS = { bpm:108, bar:0, t:null, next:0,
+  prog:[[45,'m'],[41,'M'],[43,'M'],[40,'m']],            // MIDI roots A2 F2 G2 E2
+  step(){ return 60/this.bpm/4; } };
+const mtof = n => 440*Math.pow(2,(n-69)/12);
+function musVoice(type, freq, t, dur, vol, cutoff, dest, detune=0){
+  const o=AU.ctx.createOscillator(); o.type=type; o.frequency.value=freq; o.detune.value=detune;
+  const g=AU.ctx.createGain(); g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(vol,t+0.008);
+  g.gain.exponentialRampToValueAtTime(0.0008,t+dur);
+  const f=AU.ctx.createBiquadFilter(); f.type='lowpass'; f.frequency.value=cutoff; f.Q.value=6;
+  o.connect(f).connect(g).connect(dest||AU.musG); o.start(t); o.stop(t+dur+0.02);
+  return f;
+}
+function musNoise(t, dur, vol, type, freq, dest){
+  const n=AU.ctx.createBufferSource(); n.buffer=AU.noise;
+  const f=AU.ctx.createBiquadFilter(); f.type=type; f.frequency.value=freq;
+  const g=AU.ctx.createGain(); g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(0.0008,t+dur);
+  n.connect(f).connect(g).connect(dest||AU.musG); n.start(t, Math.random()*0.8); n.stop(t+dur+0.02);
+}
 function musicLoop(){
   if(!AU.ctx) return;
-  const bar = MUS.bar++ % 4, root = MUS.root[bar];
-  const t0 = AU.ctx.currentTime+0.05;
-  MUS.seq.forEach((st,i)=>{
-    const f = root*Math.pow(2,st/12);
-    const o = AU.ctx.createOscillator(); o.type = i%2?'sine':'triangle'; o.frequency.value=f*2;
-    const g = AU.ctx.createGain(); const ts=t0+i*0.5;
-    g.gain.setValueAtTime(0,ts); g.gain.linearRampToValueAtTime(0.5,ts+0.06);
-    g.gain.exponentialRampToValueAtTime(0.001,ts+0.48);
-    const fl=AU.ctx.createBiquadFilter(); fl.type='lowpass'; fl.frequency.value=1200;
-    o.connect(g).connect(fl).connect(AU.musG); o.start(ts); o.stop(ts+0.5);
-  });
-  // bass drone
-  const b=AU.ctx.createOscillator(); b.type='sawtooth'; b.frequency.value=root/2;
-  const bg=AU.ctx.createGain(); bg.gain.setValueAtTime(0.0,t0);
-  bg.gain.linearRampToValueAtTime(0.10,t0+0.4); bg.gain.linearRampToValueAtTime(0.0,t0+3.9);
-  const bf=AU.ctx.createBiquadFilter(); bf.type='lowpass'; bf.frequency.value=240;
-  b.connect(bg).connect(bf).connect(AU.musG); b.start(t0); b.stop(t0+4);
-  MUS.t=setTimeout(musicLoop, 4000);
+  const now = AU.ctx.currentTime, st = MUS.step();
+  if(MUS.next < now) MUS.next = now + 0.05;                 // tab was asleep: resync
+  const bar = MUS.bar++, [root, q] = MUS.prog[bar % 4], t0 = MUS.next;
+  const third = q==='m'?3:4;
+  const sweep = 380 + 1500*(0.5+0.5*Math.sin(bar/8*Math.PI*2));   // 8-bar filter sweep
+  const section = Math.floor(bar/8) % 4;                    // 0 intro, 1-3 full
+  for(let s=0;s<16;s++){
+    const t = t0 + s*st;
+    // kick: four on the floor
+    if(s%4===0){ const k=AU.ctx.createOscillator(), kg=AU.ctx.createGain();
+      k.type='sine'; k.frequency.setValueAtTime(130,t); k.frequency.exponentialRampToValueAtTime(42,t+0.16);
+      kg.gain.setValueAtTime(section?0.9:0.55,t); kg.gain.exponentialRampToValueAtTime(0.001,t+0.28);
+      k.connect(kg).connect(AU.musG); k.start(t); k.stop(t+0.3); }
+    // clap on 2 and 4
+    if(section && (s===4||s===12)) musNoise(t,0.16,0.35,'bandpass',1600);
+    // offbeat hats, a ghost 16th now and then
+    if(s%4===2) musNoise(t,0.05,0.22,'highpass',7500);
+    else if(section && Math.random()<0.18) musNoise(t,0.03,0.08,'highpass',9000);
+    // rolling bass: root 16ths, octave pops on the "and"s
+    const bn = root + (s===6||s===14 ? 12 : 0) + (s===11 ? 7 : 0);
+    musVoice('sawtooth', mtof(bn), t, st*0.9, s%4===0?0.26:0.18, sweep, null, s%2?7:-7);
+    // arp: chord tones over two octaves, 16ths, into the echo (enters after the intro)
+    if(section){
+      const arp=[0,third,7,12,third+12,12,7,third][s%8] + 24;
+      musVoice('square', mtof(root+arp), t, st*0.8, 0.07, 2600, AU.echo, s%2?-9:9);
+      musVoice('square', mtof(root+arp), t, st*0.8, 0.05, 2600, null, s%2?9:-9);
+    }
+    // glitch: a data packet chirp
+    if(Math.random() < (section?0.05:0.02)){
+      const o=AU.ctx.createOscillator(), g=AU.ctx.createGain(); o.type='square';
+      o.frequency.setValueAtTime(1800+Math.random()*2600,t); o.frequency.exponentialRampToValueAtTime(300+Math.random()*400,t+0.07);
+      g.gain.setValueAtTime(0.05,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.08);
+      o.connect(g).connect(AU.echo); o.start(t); o.stop(t+0.1);
+    }
+  }
+  // pad: a low, wide chord swell every bar in the full sections
+  if(section>=2) [0,third,7].forEach((iv,i)=>musVoice('sawtooth', mtof(root+24+iv), t0, st*16, 0.035, 900, null, (i-1)*12));
+  MUS.next = t0 + st*16;
+  MUS.t = setTimeout(musicLoop, Math.max(50, (MUS.next - AU.ctx.currentTime - 0.35)*1000));
 }
 function tone(f0,f1,dur,type,vol,when=0){
   if(!AU.ctx) return; const t=AU.ctx.currentTime+when;
@@ -5279,8 +5339,62 @@ const WEB3CFG={
   ids:[1,2,3,4,5,8,9,10,11,12,13,14,17,18,19,23], // V3 collection component ids
 };
 const W3={ addr:null, chainId:null, chain:null, native:null, watt:null, rewards:null, nfts:{}, rates:{}, staked:[], busy:false, err:null };
-const w3Eth=()=>window.ethereum;
-const w3Has=()=>!!window.ethereum;
+/* Wallet choice (Rabby / MetaMask / Phantom / any EIP-6963 wallet). Wallets announce
+   themselves via EIP-6963, so several installed wallets don't fight over
+   window.ethereum. The chosen one is remembered per device. */
+const WPICK = { list:{}, rdns:(()=>{ try{ return localStorage.getItem('mgWalletRdns')||''; }catch(e){ return ''; } })(), prov:null };
+window.addEventListener('eip6963:announceProvider', e=>{ const d=e.detail; if(d&&d.info&&d.provider) WPICK.list[d.info.rdns]=d; });
+window.dispatchEvent(new Event('eip6963:requestProvider'));
+function wpickLegacy(id){            // wallets that only inject window.ethereum / window.phantom
+  const eth=window.ethereum, all=(eth&&eth.providers)||(eth?[eth]:[]);
+  if(id==='app.phantom') return (window.phantom&&window.phantom.ethereum)||all.find(p=>p.isPhantom)||null;
+  if(id==='io.rabby') return all.find(p=>p.isRabby)||null;
+  if(id==='io.metamask') return all.find(p=>p.isMetaMask&&!p.isRabby&&!p.isPhantom&&!p.isBraveWallet)||null;
+  return null;
+}
+function wpickProvider(id){ return (WPICK.list[id]&&WPICK.list[id].provider)||wpickLegacy(id); }
+const w3Eth=()=>WPICK.prov||(WPICK.rdns&&wpickProvider(WPICK.rdns))||window.ethereum;
+const w3Has=()=>!!w3Eth();
+const WPICK_WALLETS=[
+  { id:'io.rabby',    name:'Rabby',    icon:'🐰', site:'https://rabby.io/' },
+  { id:'io.metamask', name:'MetaMask', icon:'🦊', site:'https://metamask.io/download/',
+    mobile:u=>'https://metamask.app.link/dapp/'+u.replace(/^https?:\/\//,'') },
+  { id:'app.phantom', name:'Phantom',  icon:'👻', site:'https://phantom.com/download', note:'Polygon only — Phantom can’t add Altcoinchain',
+    mobile:u=>'https://phantom.app/ul/browse/'+encodeURIComponent(u)+'?ref='+encodeURIComponent(location.origin) },
+];
+function openWalletPicker(goLive){
+  WPICK.goLive=goLive!==false;
+  window.dispatchEvent(new Event('eip6963:requestProvider'));
+  const mobile=/Android|iPhone|iPad/i.test(navigator.userAgent);
+  const gameUrl=(()=>{ try{ return (window.top===window?location.href:document.referrer)||location.href; }catch(e){ return location.href; } })().split('#')[0];
+  const row=(icon,name,sub,attrs)=>`<button class="hbtn" ${attrs} style="display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;margin:6px 0;text-align:left">`+
+    `<span style="font-size:22px;width:28px;text-align:center">${icon}</span><span style="flex:1"><b style="font-size:14px">${name}</b><br><small style="color:var(--dim);font-weight:400">${sub}</small></span></button>`;
+  let h='';
+  for(const w of WPICK_WALLETS){
+    const found=!!wpickProvider(w.id), d=WPICK.list[w.id];
+    const icon=d&&d.info.icon?`<img src="${d.info.icon}" alt="" style="width:26px;height:26px;border-radius:6px">`:w.icon;
+    if(found) h+=row(icon,w.name,(w.note?w.note+' · ':'')+'detected — tap to sign in',`data-wpick="${w.id}"`);
+    else if(mobile&&w.mobile) h+=row(icon,w.name,'open the game in the '+w.name+' app',`data-wlink="${w.mobile(gameUrl)}"`);
+    else h+=row(icon,w.name,'not installed — get '+w.name,`data-wlink="${w.site}"`);
+  }
+  const others=Object.values(WPICK.list).filter(d=>!WPICK_WALLETS.some(w=>w.id===d.info.rdns));
+  if(others.length){ h+='<div style="color:var(--dim);font-size:11px;margin:10px 0 2px">Other wallets in this browser</div>';
+    for(const d of others) h+=row(`<img src="${d.info.icon}" alt="" style="width:26px;height:26px;border-radius:6px">`,d.info.name,'detected — tap to sign in',`data-wpick="${d.info.rdns}"`); }
+  h+='<div style="color:var(--dim);font-size:11px;margin-top:8px;line-height:1.5">Signing in only shares your address. Your NFTs become your rigs and balances and pools are real. Nothing is sent without you approving it in the wallet.</div>';
+  $('wpick-body').innerHTML=h;
+  $('wpick-body').querySelectorAll('[data-wpick]').forEach(b=>b.onclick=()=>wpickChoose(b.dataset.wpick));
+  $('wpick-body').querySelectorAll('[data-wlink]').forEach(b=>b.onclick=()=>{ const u=b.dataset.wlink; try{ (window.top||window).location.href=u; }catch(e){ window.open(u,'_blank'); } });
+  openModal('m-wpick');
+}
+async function wpickChoose(id){
+  const p=wpickProvider(id); if(!p) return;
+  if(WPICK.prov!==p){ WPICK.prov=p; w3Connect._wired=0; W3.addr=null; }
+  WPICK.rdns=id; try{ localStorage.setItem('mgWalletRdns',id); }catch(e){}
+  closeModal('m-wpick');
+  await w3Connect();
+  if(W3.addr&&WPICK.goLive&&!(typeof isLive==='function'&&isLive())) setMode('live');
+}
+window.openWalletPicker=openWalletPicker;
 const w3Short=a=>a?a.slice(0,6)+'…'+a.slice(-4):'';
 const encU=n=>BigInt(n).toString(16).padStart(64,'0');
 const encA=a=>a.replace(/^0x/,'').toLowerCase().padStart(64,'0');
@@ -5925,7 +6039,7 @@ function setMode(m){
   setBadgeOwned(!!S.badge); setTowerOwned(!!S.tower);
   rebuildAllRigs(); buildFarm(); refreshRings();
   selRig=-1; selTower=false; renderRigPanel&&renderRigPanel();
-  if(m==='live'&&!W3.addr){ toast('🔗 LIVE MODE — connect a wallet (🦊): your NFTs become your rigs, balances and pools are real','gold',9000); }
+  if(m==='live'&&!W3.addr){ openWalletPicker(false); toast('🔗 LIVE MODE — connect a wallet (🦊): your NFTs become your rigs, balances and pools are real','gold',9000); }
   else toast(m==='live'?'🔗 LIVE MODE — your wallet IS the game: real NFTs, real balances, real on-chain pools':'🎮 DEMO MODE — simulated economy, nothing on-chain','cyan',7000);
   if(m==='live'&&W3.addr) w3Refresh().catch(()=>{});    // mirror wallet NFTs -> rigs + inventory
   renderHud&&renderHud(); if($('m-pool')&&$('m-pool').classList.contains('open')) renderPoolHub();
@@ -7974,7 +8088,7 @@ $('sell-pol').onclick=()=>sellCoin('pol');
 $('sell-alt').onclick=()=>sellCoin('alt');
 $('b-share').onclick=shareX;
 $('b-reset').onclick=()=>{ if(confirm('Wipe your entire garage and start over? (only the '+(S&&S.mode==='live'?'LIVE':'DEMO')+' world is wiped)')){ localStorage.removeItem(keyForMode(S?S.mode:'demo')); location.reload(); } };
-$('b-wallet').onclick=()=>{ openModal('m-web3'); renderWallet(); if(w3Has()&&!W3.addr) w3Connect(); };
+$('b-wallet').onclick=()=>{ if(!W3.addr) return openWalletPicker(false); openModal('m-web3'); renderWallet(); };
 $('bench-close').onclick=()=>closeBench();
 $('bench-shop').onclick=()=>{ openModal('m-shop'); renderShop(); };
 /* ================= WALK CONTROLLER =================
@@ -9093,7 +9207,7 @@ const NET = (() => {
     // it joins chat-only (you stay in your lab); when connected, it expands/
     // collapses the chat; the ✕ leaves entirely.
     const pill = document.createElement('div');
-    pill.style.cssText = 'pointer-events:auto;display:flex;gap:8px;align-items:center;background:rgba(12,16,26,0.9);border:1px solid #232c44;border-radius:20px;color:#e8ecf6;padding:6px 12px;font:inherit';
+    pill.style.cssText = 'pointer-events:auto;display:flex;gap:8px;align-items:center;white-space:nowrap;background:rgba(12,16,26,0.9);border:1px solid #232c44;border-radius:20px;color:#e8ecf6;padding:6px 12px;font:inherit';
     dotEl = document.createElement('span');
     dotEl.style.cssText = 'width:9px;height:9px;border-radius:50%;background:#5b6478;flex:0 0 auto';
     const label = document.createElement('span'); label.textContent = 'Lounge'; label.style.cssText = 'font-weight:600;cursor:pointer';
