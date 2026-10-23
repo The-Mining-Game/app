@@ -2790,19 +2790,37 @@ function mgGenWallet(){
   } });
   document.currentScript.parentNode.insertBefore(map, document.currentScript.nextSibling);
 
-  function notice(title, body, retry) {
+  function notice(title, body, retry, link) {
     if (document.getElementById('mg-compat-notice')) return;
     var d = document.createElement('div');
     d.id = 'mg-compat-notice';
-    d.setAttribute('style', 'position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.88);color:#e2e8f0;font:15px/1.5 system-ui,sans-serif;padding:24px;text-align:center');
-    d.innerHTML = '<div style="max-width:420px"><div style="font-size:20px;font-weight:700;color:#facc15;margin-bottom:8px"></div><div></div>' +
-      (retry ? '<button style="margin-top:18px;background:#eab308;color:#000;border:0;border-radius:10px;padding:10px 22px;font-weight:600">Reload</button>' : '') + '</div>';
-    d.querySelector('div div').textContent = title;
-    d.querySelectorAll('div div')[1].textContent = body;
-    if (retry) d.querySelector('button').onclick = function () { location.reload(); };
+    d.setAttribute('style', 'position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.92);color:#e2e8f0;font:15px/1.5 system-ui,sans-serif;padding:24px;text-align:center');
+    var box = document.createElement('div'); box.style.maxWidth = '420px';
+    var h = document.createElement('div'); h.setAttribute('style', 'font-size:20px;font-weight:700;color:#facc15;margin-bottom:8px'); h.textContent = title;
+    var b = document.createElement('div'); b.textContent = body;
+    box.appendChild(h); box.appendChild(b);
+    var btn = 'display:inline-block;margin:18px 6px 0;background:#eab308;color:#000;border:0;border-radius:10px;padding:10px 22px;font-weight:600;text-decoration:none';
+    if (link) { var a = document.createElement('a'); a.href = link[1]; a.textContent = link[0]; a.setAttribute('style', btn); box.appendChild(a); }
+    if (retry) { var r = document.createElement('button'); r.textContent = 'Reload'; r.setAttribute('style', btn); r.onclick = function () { location.reload(); }; box.appendChild(r); }
+    d.appendChild(box);
     (document.body || document.documentElement).appendChild(d);
   }
-  if (!window.__MG_WEBGL) {
+  // The game and three.js use 2020+ JavaScript (?. and ??). Older browsers, e.g. the
+  // Chrome 79 that ships on a Galaxy Note 8, cannot even parse it, so say so plainly.
+  var modern = true;
+  try { new Function('var a={};return a?.b??(a.c||=1)'); } catch (e) { modern = false; }
+  window.__MG_MODERN = modern;
+  if (!modern) {
+    var android = /Android/i.test(navigator.userAgent);
+    var cv = (navigator.userAgent.match(/Chrome\/(\d+)/) || [])[1];
+    addEventListener('DOMContentLoaded', function () {
+      notice('Update your browser to play',
+        'The Mining Game needs a browser from 2021 or newer.' + (cv ? ' This one is Chrome ' + cv + '.' : '') +
+        ' Update Chrome (or Samsung Internet) from the ' + (android ? 'Play Store' : 'app store') + ', then reload this page.',
+        true, android ? ['Update Chrome', 'market://details?id=com.android.chrome'] : null);
+    });
+  }
+  if (modern && !window.__MG_WEBGL) {
     addEventListener('DOMContentLoaded', function () {
       notice('3D graphics are turned off', 'This browser has WebGL disabled or unsupported. Update Chrome (or Samsung Internet), turn off battery saver / "reduce animations", or try another browser.', true);
     });
@@ -2812,7 +2830,7 @@ function mgGenWallet(){
     // Only the game's own scripts: wallet extensions inject code that throws here too.
     var src = (e && e.filename) || '';
     if (/^(chrome|moz|safari)-extension:|^$/.test(src)) return;
-    if (Date.now() - started < 20000 && e && e.message && !/ResizeObserver/.test(e.message)) {
+    if (modern && Date.now() - started < 20000 && e && e.message && !/ResizeObserver/.test(e.message)) {
       notice('The game could not start', 'Your browser is too old for The Mining Game (' + e.message + '). Update Chrome or Samsung Internet, then reload.', true);
     }
   });
