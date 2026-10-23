@@ -200,12 +200,19 @@ button{font-family:inherit;cursor:pointer}
   #feed{width:210px;bottom:76px}
   /* Keep the top strips as single, horizontally-scrollable rows instead of
      letting them wrap into overlapping rows (the "jumble" on phones). */
-  #hud{gap:5px;padding:6px 8px}
-  #hudbtns{flex-wrap:wrap;gap:5px}
+  /* Phones: row 1 = logo + stats, row 2 = every button in one swipeable row.
+     (Wrapping buttons grew the HUD to 4 rows and buried the coin bar.) */
+  #hud{gap:5px;padding:6px 8px;flex-wrap:wrap}
+  #stats{flex:1 1 0;min-width:0}
+  #hudbtns{flex:1 1 100%;margin-left:0;flex-wrap:nowrap;justify-content:flex-start;gap:5px;
+    overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  #hudbtns::-webkit-scrollbar{display:none}
+  #hudbtns>*{flex:0 0 auto;white-space:nowrap}
+  #tut{left:10px!important;right:10px!important;width:auto!important;max-width:none}
   #stats{flex-wrap:nowrap;overflow-x:auto;max-width:100%;-webkit-overflow-scrolling:touch;scrollbar-width:none}
   #stats::-webkit-scrollbar{display:none}
   #stats .stat{flex:0 0 auto}
-  #wallet{top:96px;flex-wrap:nowrap;overflow-x:auto;max-width:calc(100vw - 16px);-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  #wallet{top:var(--hud-h,96px);flex-wrap:nowrap;overflow-x:auto;max-width:calc(100vw - 16px);-webkit-overflow-scrolling:touch;scrollbar-width:none}
   #wallet::-webkit-scrollbar{display:none}
   #wallet .coin{flex:0 0 auto}
   /* Pool-Hub / list rows: stack the controls under the label so CLAIM / STOP /
@@ -8643,6 +8650,12 @@ window.__recAudioStart=async function(){
   return 'recording';
 };
 window.__recAudioStop=async function(){ clearInterval(window.__audEvT); window.__audRec.stop(); return await window.__audDone; };
+</script>
+<script>
+/* Keep the coin bar directly below the top HUD, whatever height it ends up. */
+(function(){function fit(){var h=document.getElementById('hud');if(h)document.documentElement.style.setProperty('--hud-h',Math.ceil(h.getBoundingClientRect().bottom+2)+'px');}
+addEventListener('resize',fit);addEventListener('load',fit);document.addEventListener('DOMContentLoaded',function(){fit();
+if(window.ResizeObserver){var h=document.getElementById('hud');if(h)new ResizeObserver(fit).observe(h);}});})();
 </script>
 </body>
 </html>
