@@ -6731,9 +6731,9 @@ async function ocPublicPoolsHtml(skipKey){
       const eng=new E.Contract(c.pools.engine,POOL_ABI.engine,new E.JsonRpcProvider(c.rpc,c.chainId,{staticNetwork:true}));
       const n=Number(await eng.poolCount());
       const ps=await Promise.all(Array.from({length:n},(_,i)=>eng.getPool(i)));
-      const rows=ps.map((p,i)=>!p.active?'':`<div class="prow"><div class="pi"><b>🟢 #${i} ${p.name}</b>
+      const rows=ps.map((p,i)=>!p.active?'':`<div class="prow" data-pickpool="${k}:${i}:${Number(p.requiredAlgo)}" style="cursor:pointer" title="Mine in this pool"><div class="pi"><b>🟢 #${i} ${p.name}</b>
         <small>coins: <b>${(p.targetIds||[]).map(t=>WEB3CFG.targets[Number(t)]?.sym||'?').join(' · ')}</b> · ${Number(p.requiredAlgo)===255?'any rig':'algo '+Number(p.requiredAlgo)+' rigs'} · host ${w3Short(p.owner)} · ${Number(p.minersActive)} rig${Number(p.minersActive)===1?'':'s'} mining</small></div>
-        <div class="pf">${(Number(p.rewardFeeBps)/100).toFixed(1)}%<small>fee</small></div></div>`).join('');
+        <div class="pf">${(Number(p.rewardFeeBps)/100).toFixed(1)}%<small>fee</small></div><button class="hbtn accent">MINE HERE ›</button></div>`).join('');
       return `<div class="valbox" style="border-color:#3dff8a44"><b>⛏ MINING POOLS — ${c.name}</b>
         <small>${W3.addr&&W3.chain&&W3.chain.key===k?'':'Switch your wallet to <b>'+c.name+'</b> to MINE in these pools with your rigs.'}</small>
         ${rows||`<small style="color:var(--dim)">No pools on ${c.name} yet.</small>`}</div>`;
@@ -6741,6 +6741,33 @@ async function ocPublicPoolsHtml(skipKey){
   }));
   return blocks.join('');
 }
+/* Clicking a pool row: connect -> switch to that pool's chain -> preselect the
+   pool on every rig whose algorithm it accepts and scroll there (MINE stays an
+   explicit press). Rigs are chain-specific NFTs, so with none on that chain we
+   say so instead of silently doing nothing. */
+async function ocPickPool(key,poolId,algo){
+  const c=WEB3CFG.chains[key]; if(!c) return;
+  toast(`⛏ ${c.name} pool #${poolId} — `+(W3.addr?'checking your rigs…':'approve the connection in your wallet…'),'cyan',6000);
+  if(!W3.addr){ await w3Connect(); if(!W3.addr){ toast('Connect a wallet to mine in '+c.name+' pools','gold',7000); return; } }
+  if(!W3.chain||W3.chain.key!==key){
+    toast('🔗 Switching your wallet to '+c.name+'…','cyan',6000);
+    await w3Switch(key);
+    for(let i=0;i<40&&!(W3.chain&&W3.chain.key===key);i++) await new Promise(r=>setTimeout(r,250));
+    if(!(W3.chain&&W3.chain.key===key)){ toast('Switch your wallet to '+c.name+' to mine in this pool','gold',8000); return; }
+  }
+  await fillChainPools();
+  for(let i=0;i<40&&_ocBusy;i++) await new Promise(r=>setTimeout(r,250));
+  const sels=[...document.querySelectorAll('#chainpools select[id^="oc-pool-"]')];
+  const fit=sels.filter(x=>algo===255||Number(x.dataset.algo)===algo);
+  if(!sels.length){ SFX.err(); toast(`You have no mining-rig NFTs on ${c.name} — rigs are separate NFTs per chain. Claim the FREE Gaming PC in 🛒 SHOP (one per wallet) or get a rig on ${c.name}, then pick this pool again.`,'gold',14000); return; }
+  if(!fit.length){ SFX.err(); toast(`None of your ${c.name} rigs run algo ${algo}, which pool #${poolId} requires — pick a pool that matches your rig's algo.`,'gold',12000); return; }
+  fit.forEach(x=>{ x.value=String(poolId); x.closest('.prow')?.style.setProperty('outline','2px solid var(--grn)'); });
+  fit[0].scrollIntoView({behavior:'smooth',block:'center'});
+  SFX.click(); toast(`⛏ Pool #${poolId} selected on ${fit.length} rig${fit.length===1?'':'s'} — press MINE on the highlighted rig`,'grn',9000);
+}
+if(!window._ocPickWired){ window._ocPickWired=1;
+  document.addEventListener('click',e=>{ const r=e.target.closest&&e.target.closest('[data-pickpool]'); if(!r) return;
+    const [k,i,a]=r.dataset.pickpool.split(':'); ocPickPool(k,+i,+a); }); }
 async function fillChainPools(){
   ocRenderWallet(); // live balances strip, independent of the pools contracts
   const el=$('chainpools'); if(!el) return;
@@ -6807,7 +6834,7 @@ async function fillChainPools(){
       const opts=engPools.map((p,pi)=>p.active?`<option value="${pi}">#${pi} ${p.name} → ${(p.targetIds||[]).map(t=>WEB3CFG.targets[Number(t)]?.sym||'?').join('+')} (fee ${(Number(p.rewardFeeBps)/100).toFixed(1)}%)</option>`:'').join('');
       const stakeBtn = c.pools.stakingPool?`<button class="hbtn gold" data-ocstake="${id}" title="Power off + stake on-chain: earn 100% stake weight from the WATT drip">🥩 STAKE</button>`:'';
       rigRows+=`<div class="prow"><div class="pi"><b>⛏ RIG #${id}</b><small>${t.hashRate} H · eff ${t.efficiency} · ${t.wattConsumption} ⚡/h · algo ${t.algorithm}</small></div>
-        ${opts?`<select id="oc-pool-${id}" class="hbtn">${opts}</select><button class="hbtn accent" data-ocmine="${id}">MINE</button>`:''}${stakeBtn}${!opts&&!stakeBtn?'<small style="color:var(--dim)">no active pools</small>':''}</div>`;
+        ${opts?`<select id="oc-pool-${id}" class="hbtn" data-algo="${t.algorithm}">${opts}</select><button class="hbtn accent" data-ocmine="${id}">MINE</button>`:''}${stakeBtn}${!opts&&!stakeBtn?'<small style="color:var(--dim)">no active pools</small>':''}</div>`;
     }
     /* STAKED rigs — escrowed in the StakingPool so they leave the wallet list;
        read them back from the pool with pending WATT, unstake + claim inline. */
