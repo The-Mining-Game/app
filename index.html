@@ -84,6 +84,27 @@ button{font-family:inherit;cursor:pointer}
 #coin-alt button:hover:not(:disabled){background:#ff8d2e;color:#1a1200}
 #coin-wtx{border-color:rgba(255,210,63,.45)} #coin-wtx button{background:rgba(255,210,63,.22)}
 #coin-wtx button:hover:not(:disabled){background:#ffd23f;color:#1a1200}
+#coin-hth{border-color:rgba(46,204,95,.45)} #coin-hth button{background:rgba(46,204,95,.22)}
+#coin-hth button:hover:not(:disabled){background:#2ecc5f;color:#04140a}
+#coin-bitn{border-color:rgba(64,156,255,.45)} #coin-bitn button{background:rgba(64,156,255,.22)}
+#coin-bitn button:hover:not(:disabled){background:#409cff;color:#03101f}
+/* SELL popup for HTH/BITN — live aggregator quotes */
+#sxp{position:fixed;inset:0;background:#000b;z-index:9999;display:flex;align-items:center;justify-content:center}
+#sxp .box{background:#111826;border:1px solid #ffb14566;border-radius:12px;padding:16px;width:min(480px,94vw);max-height:90vh;overflow:auto;color:#e6e9f0;font-size:12px}
+#sxp h3{margin:0 0 8px;color:#ffb145;font-size:15px}
+#sxp .row{display:flex;gap:6px;align-items:center;margin:6px 0}
+#sxp input{flex:1;background:#1c1c2a;border:1px solid #34344a;color:#eee;border-radius:7px;padding:8px;font:inherit}
+#sxp .tg{display:flex;flex-wrap:wrap;gap:5px;margin:6px 0}
+#sxp .tg button{background:#1a2133;border:1px solid #2c3550;color:#cdd3e0;border-radius:16px;padding:5px 11px;font:inherit;font-weight:700;cursor:pointer}
+#sxp .tg button.on{border-color:#ffb145;color:#ffb145;background:#2a2010}
+#sxp .rt{border:1px solid #2a3248;border-radius:9px;padding:9px;margin:7px 0;background:#0d1320}
+#sxp .rt.best{border-color:#3dff8a88}
+#sxp .rt .h{display:flex;justify-content:space-between;gap:8px;font-weight:800}
+#sxp .rt .h b{color:#3dff8a}
+#sxp .rt small{display:block;color:#8d97ab;line-height:1.55;margin-top:3px}
+#sxp .bad{color:#ff8a8a}
+#sxp .act{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+#sxp .act button{flex:1;min-width:140px}
 /* nothing to sell — make that obvious instead of firing an error buzz on click */
 .coin button:disabled{opacity:.32;cursor:not-allowed;background:rgba(255,255,255,.05)}
 .coin button:disabled:hover{background:rgba(255,255,255,.05)}
@@ -254,7 +275,24 @@ body.touch.walkoff #net-ui{bottom:12px!important}
 .os-pat{position:absolute;inset:0;opacity:.05;pointer-events:none;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90'%3E%3Ccircle cx='45' cy='45' r='20' fill='none' stroke='%23ffd23f' stroke-width='2'/%3E%3Crect x='38' y='36' width='14' height='11' rx='2' fill='none' stroke='%23ffd23f' stroke-width='2'/%3E%3Cline x1='41' y1='31' x2='41' y2='37' stroke='%23ffd23f' stroke-width='2'/%3E%3Cline x1='49' y1='31' x2='49' y2='37' stroke='%23ffd23f' stroke-width='2'/%3E%3Cline x1='45' y1='47' x2='45' y2='53' stroke='%23ffd23f' stroke-width='2'/%3E%3C/svg%3E")}
 /* icons */
-#os-icons{position:absolute;top:18px;left:14px;display:flex;flex-direction:column;gap:16px;z-index:2}
+#os-icons{position:absolute;top:18px;left:14px;bottom:56px;display:flex;flex-direction:column;flex-wrap:wrap;align-content:flex-start;gap:10px 6px;z-index:2}
+/* full-size web app windows (wattxchange.app DEX / swaps / explorers) */
+.oswin.web .wbody{padding:0;display:flex;flex-direction:column;overflow:hidden;flex:1;min-height:0}
+.oswin.web .os-url{margin:0;border-radius:0;border-left:0;border-right:0;border-top:0}
+.oswin.web .os-url input{flex:1;background:none;border:none;color:#c9c9ce;font:inherit;outline:none;min-width:0}
+.oswin.web .os-url button{background:#1c1c20;border:1px solid #2c2c31;color:#ccc;border-radius:5px;padding:2px 8px;font:inherit;cursor:pointer}
+.oswin.web .os-url button:hover{border-color:#ffd23f66;color:#ffd23f}
+.oswin.web iframe{flex:1;width:100%;border:0;background:#0b0e14}
+.os-tabs{display:flex;flex-wrap:wrap;gap:4px;padding:6px 8px;background:#0e0e10;border-bottom:1px solid #232327}
+.os-tabs button{background:#18181b;border:1px solid #2a2a2e;color:#bbb;border-radius:6px;padding:3px 9px;font:inherit;font-size:11px;cursor:pointer}
+.os-tabs button.on{border-color:#ffd23f88;color:#ffd23f}
+/* start menu */
+#os-start{position:absolute;left:8px;bottom:50px;width:250px;max-height:calc(100% - 70px);overflow:auto;background:#121214;border:1px solid #2e2e33;border-radius:10px;box-shadow:0 18px 60px rgba(0,0,0,.75);z-index:60;padding:6px}
+#os-start .sh{font-size:9.5px;letter-spacing:.16em;color:#6d6d73;padding:8px 10px 4px}
+#os-start .si{display:flex;gap:10px;align-items:center;padding:7px 10px;border-radius:7px;cursor:pointer;font-size:12px;color:#ddd}
+#os-start .si:hover{background:rgba(255,210,63,.1);color:#ffd23f}
+#os-start .si .g{width:22px;text-align:center;font-size:15px}
+#os-start .si.sub{padding-left:22px;font-size:11.5px;color:#aaa}
 .os-ic{width:86px;text-align:center;cursor:pointer;padding:6px 2px;border-radius:8px}
 .os-ic:hover{background:rgba(255,210,63,.08)}
 .os-ic .g{width:46px;height:46px;margin:0 auto 5px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;
@@ -451,6 +489,8 @@ body.touch.walkoff #net-ui{bottom:12px!important}
   <div class="coin" id="coin-pol">🟣 <b id="v-pol">0</b> POL <span class="pr" id="p-pol">@10.0</span><button id="sell-pol">SELL</button></div>
   <div class="coin" id="coin-alt">🟠 <b id="v-alt">0</b> ALT <span class="pr" id="p-alt">@25.0</span><button id="sell-alt">SELL</button></div>
   <div class="coin" id="coin-wtx">🟡 <b id="v-wtx">0</b> WTX <span class="pr" id="p-wtx">@2.0</span><button id="sell-wtx">SELL</button></div>
+  <div class="coin" id="coin-hth" title="HTH — your native wallet + wHTH on Altcoinchain/Polygon">🏠 <b id="v-hth">0</b> HTH <span class="pr" id="p-hth">—</span><button id="sell-hth">SELL</button></div>
+  <div class="coin" id="coin-bitn" title="BITN — your native wallet + wBITN on Altcoinchain/Polygon">🅱 <b id="v-bitn">0</b> BITN <span class="pr" id="p-bitn">—</span><button id="sell-bitn">SELL</button></div>
   <div class="coin" id="coin-usdt" style="display:none">💵 <b id="v-usdt">0</b> USDT</div>
   <div class="coin" id="coin-dai" style="display:none">◈ <b id="v-dai">0</b> DAI</div>
   <span id="wallet-extra" style="display:contents"></span>
@@ -6403,7 +6443,7 @@ async function w3ExtraBalances(force){
 function renderExtraCoins(){
   const el=$('wallet-extra'); if(!el) return;
   if(S.mode!=='live'||!W3.addr){ el.innerHTML=''; return; }
-  el.innerHTML=EXTRA_COINS.filter(c=>(W3X[c.sym]||0)>1e-7).map(c=>
+  el.innerHTML=EXTRA_COINS.filter(c=>c.sym!=='wHTH'&&c.sym!=='wBITN'&&(W3X[c.sym]||0)>1e-7).map(c=>
     `<div class="coin" id="coin-${c.sym.toLowerCase()}">${c.emoji} <b>${fmt(W3X[c.sym])}</b> ${c.sym} <button data-sellx="${c.sym}">SELL</button></div>`).join('');
   el.querySelectorAll('[data-sellx]').forEach(b=>b.onclick=()=>ocSellExtra(b.dataset.sellx));
 }
@@ -6482,6 +6522,129 @@ async function ocSellPopup(cn){
     toast('Route unavailable right now: '+(q?.blocked?.[0]?.note||'quote failed'),'red',9000); return false;
   }
   toast('No route for that pair yet','red'); return false;
+}
+/* ===== HTH + BITN pills — native coins sold through the cross-chain aggregator
+   (bridge.wattxchange.app/router = the wattxchange.app swap router: SwapinDEX,
+   QuickSwap, Uniswap, WATT v1→v2 migrator + bridges, GleecDEX atomic swaps,
+   THORChain …). Balance = your native wallet (explorer API, address from the
+   PayoutHub declaration or typed in the popup) + wHTH/wBITN in the EVM wallet. */
+const NATC={
+  hth: {sym:'HTH', name:'HTH', emoji:'🏠', tid:4, wrap:'wHTH',  api:'https://hth-api.wattxchange.app/api/address/',  exp:'https://hth-exp.wattxchange.app/address/'},
+  bitn:{sym:'BITN',name:'Bitnet',emoji:'🅱', tid:5, wrap:'wBITN', api:'https://bitn-exp.wattxchange.app/api/address/', exp:'https://bitn-exp.wattxchange.app/address/'},
+};
+const ROUTER_API=WATT_BRIDGE_API+'/router';
+const NB={hth:{nat:null,usd:null},bitn:{nat:null,usd:null}}; let _nbT=0, _nbHubFor=null;
+function nbAddr(cn){ let a=''; try{ a=localStorage.getItem('mgAddr_'+cn)||''; }catch(e){} return a||NB[cn].hub||''; }
+function nbSetAddr(cn,a){ try{ localStorage.setItem('mgAddr_'+cn,a||''); }catch(e){} }
+async function nbRefresh(force){
+  if(!force&&Date.now()-_nbT<60000) return; _nbT=Date.now();
+  /* the PayoutHub already knows where this miner's HTH/BITN rewards go */
+  if(W3.addr&&_nbHubFor!==W3.addr&&typeof poolCfg==='function'&&poolCfg()){
+    _nbHubFor=W3.addr;
+    try{ const hub=await poolCtr('hub');
+      for(const cn in NATC){ try{ NB[cn].hub=(await hub.payoutAddressFor(NATC[cn].tid,W3.addr))||''; }catch(e){} } }catch(e){}
+  }
+  const px=(typeof ocPrices==='function')?await ocPrices().catch(()=>null):null;
+  await Promise.all(Object.keys(NATC).map(async cn=>{
+    const c=NATC[cn], a=nbAddr(cn);
+    if(a){ try{ const j=await (await fetch(c.api+encodeURIComponent(a))).json();
+      NB[cn].nat=Number(j.balance)||0; }catch(e){} } else NB[cn].nat=null;
+    /* USD = 1 coin quoted to WATT by the aggregator × WATT/USD */
+    try{ const q=await (await fetch(`${ROUTER_API}/quote?from=${c.sym}&to=WATT&amount=1`)).json();
+      const w=px?.usd?.WATT; NB[cn].usd=(q?.best&&w)?q.best.outAmount*w:null; }catch(e){}
+  }));
+  renderNativePills();
+}
+function nbTotal(cn){ return (NB[cn].nat||0)+((typeof W3X!=='undefined'&&W3X[NATC[cn].wrap])||0); }
+function renderNativePills(){
+  for(const cn in NATC){
+    const c=NATC[cn], v=$('v-'+cn), p=$('p-'+cn), b=$('sell-'+cn), box=$('coin-'+cn); if(!v) continue;
+    v.textContent=fmt(nbTotal(cn));
+    p.textContent=NB[cn].usd!=null?usdFmt(NB[cn].usd):'—';
+    const a=nbAddr(cn), w=(typeof W3X!=='undefined'&&W3X[c.wrap])||0;
+    box.title=`${c.sym}: ${a?fmt(NB[cn].nat||0)+' native at '+a.slice(0,8)+'…':'no native address set (SELL → enter it)'}`+
+      (w?` + ${fmt(w)} ${c.wrap} in your EVM wallet`:'')+(NB[cn].usd!=null?` · 1 ${c.sym} ≈ ${usdFmt(NB[cn].usd)}`:' · no live market yet');
+    b.disabled=false;
+    b.title=`Quote ${c.sym} on every wattxchange.app venue and sell it`;
+  }
+}
+setInterval(()=>{ try{ nbRefresh(); }catch(e){} },60000);
+
+/* where each aggregator route is executed on wattxchange.app */
+const ROUTE_LABEL={'evm-route':'EVM DEX route','gleecdex':'GleecDEX atomic swap','thorchain':'THORChain','wattx-desk':'WATT⇄WTX bridge desk',
+  'swapin':'SwapinDEX','uniswap':'Uniswap','exolix':'Exolix','sideshift':'SideShift','changenow':'ChangeNOW','pepe-desk':'PEPE desk'};
+function routeLinks(r,from){
+  if(r.provider==='gleecdex') return [['⚛ OPEN ATOMIC SWAP ↗','https://wattxchange.app/#defi/atomic-swap']];
+  if(r.provider==='evm-route'){
+    const out=[]; if(NATC[from.toLowerCase()]) out.push([`1 · WRAP ${from}→w${from} ↗`,'https://bridge.wattxchange.app/wrap']);
+    out.push([(out.length?'2 · ':'')+'SWAP ON WATTXCHANGE DEX ↗','https://wattxchange.app/#dex']); return out;
+  }
+  return [['⚡ OPEN INSTANT SWAP ↗','https://wattxchange.app/#defi/instant-swap']];
+}
+const nf=(x)=>x==null?'—':(Math.abs(x)<0.01&&x!==0?Number(x).toPrecision(3):Number(x).toLocaleString(undefined,{maximumFractionDigits:4}));
+async function ocSellNative(cn){
+  const c=NATC[cn]; if(!c) return;
+  document.getElementById('sxp')?.remove();
+  const targets=['WATT','WTX','ALT','POL',cn==='hth'?'BITN':'HTH'];
+  let to='WATT', seq=0;
+  const ov=document.createElement('div'); ov.id='sxp';
+  ov.innerHTML=`<div class="box">
+    <h3>💱 SELL ${c.sym} <small style="color:#8d97ab;font-weight:400">· best price across wattxchange.app</small></h3>
+    <div class="row"><input id="sx-addr" placeholder="your ${c.sym} address (reads your balance)" value="${nbAddr(cn)}"><button class="hbtn" id="sx-save">SAVE</button></div>
+    <div id="sx-bal" style="color:#8d97ab;margin:2px 0 6px"></div>
+    <div class="row"><input id="sx-amt" type="number" min="0" step="any" placeholder="amount of ${c.sym}"><button class="hbtn" id="sx-max">MAX</button></div>
+    <div style="color:#8d97ab;font-size:10.5px;letter-spacing:.1em;margin-top:8px">RECEIVE</div>
+    <div class="tg" id="sx-to">${targets.map(t=>`<button data-t="${t}" class="${t===to?'on':''}">${t}</button>`).join('')}</div>
+    <div id="sx-q"></div>
+    <div style="color:#6d7690;font-size:10.5px;line-height:1.5;margin-top:6px">Quotes come from the wattxchange.app swap router: SwapinDEX · QuickSwap · Uniswap · WATT v1→v2 migrator · WATT bridges · GleecDEX atomic swaps · THORChain. Estimates are indicative; every leg re-quotes when you execute. Nothing is sent from here: the trade runs on wattxchange.app with your own wallet.</div>
+    <button class="hbtn" id="sx-x" style="margin-top:10px;width:100%">close</button></div>`;
+  document.body.appendChild(ov);
+  const q=$('sx-q'), amtEl=$('sx-amt');
+  const bal=()=>{ const a=nbAddr(cn), w=(typeof W3X!=='undefined'&&W3X[c.wrap])||0;
+    $('sx-bal').innerHTML=a?`balance <b style="color:#e6e9f0">${nf(NB[cn].nat||0)} ${c.sym}</b> native${w?` + ${nf(w)} ${c.wrap}`:''} · <a href="${c.exp}${encodeURIComponent(a)}" target="_blank" rel="noopener" style="color:#7fb4ff">explorer ↗</a>`
+      :(w?`${nf(w)} ${c.wrap} in your EVM wallet`:'enter your address to read your balance'); };
+  bal();
+  const run=async()=>{
+    const amt=parseFloat(amtEl.value), my=++seq;
+    if(!(amt>0)){ q.innerHTML='<div class="rt"><small>Enter an amount to see live quotes.</small></div>'; return; }
+    q.innerHTML='<div class="rt"><small>Quoting every venue…</small></div>';
+    let j=null; try{ j=await (await fetch(`${ROUTER_API}/quote?from=${c.sym}&to=${to}&amount=${amt}`)).json(); }catch(e){}
+    if(my!==seq||!document.getElementById('sxp')) return;
+    if(!j){ q.innerHTML='<div class="rt bad">Swap router unreachable — try again in a moment.</div>'; return; }
+    const px=_px?.usd||{};
+    const html=(j.routes||[]).map((r,i)=>{
+      const rate=r.outAmount/amt, usd=px[to]?r.outAmount*px[to]:null;
+      const fees=(r.fees||[]).map(f=>`${f.what}: ${nf(f.amount)} ${f.unit}${f.bps?` (${(f.bps/100).toFixed(2)}%)`:''}`);
+      if(r.feeOut) fees.push(`provider fee: ${nf(r.feeOut)} ${to}`);
+      if(r.platformFee?.bps) fees.push(`WATTxchange fee ${(r.platformFee.bps/100).toFixed(2)}%: ${nf(r.platformFee.amountOut)} ${to}`);
+      const steps=(r.steps||[]).map((s,k)=>`${k+1}. ${s.venue} — ${nf(s.in)} → ${nf(s.out)}`);
+      return `<div class="rt ${i===0?'best':''}"><div class="h"><span>${i===0?'★ ':''}${ROUTE_LABEL[r.provider]||r.provider}</span><b>≈ ${nf(r.outAmount)} ${to}</b></div>
+        <small>price 1 ${c.sym} ≈ ${nf(rate)} ${to}${usd!=null?` · ≈ ${usdFmt(usd)} total`:''} · after all fees · ~${Math.round((r.etaSeconds||300)/60)} min</small>
+        ${fees.length?`<small>fees: ${fees.join(' · ')}</small>`:''}
+        ${steps.length?`<small>${steps.join('<br>')}</small>`:''}
+        ${r.capacityWarning?`<small style="color:#ffb145">${r.capacityWarning}</small>`:''}${r.note&&!/indicative/.test(r.note)?`<small>${r.note}</small>`:''}
+        <div class="act">${routeLinks(r,c.sym).map(([l,u])=>`<button class="hbtn accent" data-go="${u}">${l}</button>`).join('')}</div></div>`;
+    }).join('');
+    const errs=(j.errors||[]).map(e=>`<small class="bad">${ROUTE_LABEL[e.provider]||e.provider}: ${e.error}</small>`).join('');
+    q.innerHTML=html||`<div class="rt"><div class="h"><span>No live route for ${c.sym} → ${to} yet</span></div>${errs||'<small>no venue lists this pair</small>'}
+      <small>Once the w${c.sym}/WATT pool on SwapinDEX has liquidity (or the GleecDEX maker lists ${c.sym}), quotes appear here automatically.</small>
+      <div class="act"><button class="hbtn accent" data-go="https://bridge.wattxchange.app/wrap">WRAP ${c.sym} ↗</button><button class="hbtn" data-go="https://wattxchange.app/#dex">OPEN DEX ↗</button></div></div>`;
+    if(html&&errs) q.insertAdjacentHTML('beforeend',`<div class="rt">${errs}</div>`);
+    q.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{ SFX.click(); window.open(b.dataset.go,'_blank','noopener'); });
+  };
+  let t=null; const deb=()=>{ clearTimeout(t); t=setTimeout(run,450); };
+  amtEl.oninput=deb;
+  $('sx-max').onclick=()=>{ amtEl.value=String(+nbTotal(cn).toFixed(8)||''); run(); };
+  $('sx-to').querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{ to=b.dataset.t; SFX.click();
+    $('sx-to').querySelectorAll('[data-t]').forEach(x=>x.classList.toggle('on',x===b)); run(); });
+  $('sx-save').onclick=async()=>{ const a=$('sx-addr').value.trim();
+    if(a&&!ocAddrLooksOk(c.sym,a)){ SFX.err(); toast('That does not look like a '+c.sym+' address','red'); return; }
+    nbSetAddr(cn,a); SFX.buy(); await nbRefresh(true); bal(); if(!amtEl.value&&nbTotal(cn)>0){ amtEl.value=String(+nbTotal(cn).toFixed(8)); } run(); };
+  $('sx-x').onclick=()=>ov.remove();
+  ov.onclick=(e)=>{ if(e.target===ov) ov.remove(); };
+  if(nbTotal(cn)>0) amtEl.value=String(+nbTotal(cn).toFixed(8)); else amtEl.value='100';
+  run();
+  nbRefresh(true).then(()=>{ if(document.getElementById('sxp')) bal(); });
 }
 function poolCfg(){ return (W3.addr&&W3.chain&&W3.chain.pools)?W3.chain:null; }
 async function poolCtr(kind,write){
@@ -7271,6 +7434,9 @@ $('coin-pool').onclick=async()=>{
   joinPool(coin,pick);
 };
 $('sell-wtx').onclick=()=>sellCoin('wtx');
+$('sell-hth').onclick=()=>ocSellNative('hth');
+$('sell-bitn').onclick=()=>ocSellNative('bitn');
+setTimeout(()=>{ try{ nbRefresh(true); }catch(e){} },4000);
 
 /* ================= UI ================= */
 function toast(txt, cls='', dur=4200){
@@ -7331,6 +7497,7 @@ function renderHud(){
       : (has?`Sell all ${fmt(bal)} ${cn.toUpperCase()} → +${fmt(bal*S.price[cn])} ⚡WATT`
              :`No ${cn.toUpperCase()} to sell — mine some first`);
   });
+  if(typeof renderNativePills==='function') renderNativePills();
   $('v-usdt').textContent=fmt(S.usdt); $('v-dai').textContent=fmt(S.dai);
   if(typeof renderExtraCoins==='function'){ renderExtraCoins(); if(S.mode==='live'&&W3.addr) w3ExtraBalances(); }
   $('coin-usdt').style.display=S.usdt>0.005?'flex':'none';
@@ -7839,30 +8006,84 @@ function osDesktop(){
     <div id="os-clock"><span class="dot"></span><div><b id="os-time"></b><small id="os-net2"></small></div>
       <button class="os-task" id="os-exit" style="margin-left:6px">⏻ EXIT OS</button></div>
   </div>`);
-  const APPS=[
-    ['miner','⛏','Miner',osAppMiner],
-    ['tunex','🎛','TuneX OC',osAppTunex],
-    ['dex','⇄','SwapinDEX',osAppDex],
-    ['wallet','👛','Wallet',osAppWallet],
-    ['web','🌐','Browser',osAppWeb],
-  ];
   const ic=$('os-icons');
-  APPS.forEach(([k,g,nm,fn])=>{
+  OS_APPS.forEach(([k,g,nm,fn,opt])=>{
     const d=osEl(`<div class="os-ic" data-app="${k}"><div class="g">${g}</div><span>${nm}</span></div>`);
-    d.onclick=()=>{ SFX.click(); osOpenWin(k,g,nm,fn); };
+    d.onclick=()=>{ SFX.click(); osOpenWin(k,g,nm,fn,opt); };
     ic.appendChild(d);
   });
-  $('os-power').onclick=closeOS;
+  $('os-power').title='Start';
+  $('os-power').onclick=e=>{ e.stopPropagation(); osStartMenu(); };
   $('os-exit').onclick=closeOS;
   osTick();
   clearInterval(OS.iv); OS.iv=setInterval(osTick,600);
   osOpenWin('miner','⛏','Miner',osAppMiner); // auto-open the miner terminal
 }
+/* ---------- apps: desktop shortcuts + start menu ---------- */
+const WXA='https://wattxchange.app';
+const OS_EXPLORERS=[
+  ['WTX','WATTx','https://wtx-exp.wattxchange.app'],
+  ['ALT','Altcoinchain','https://alt-exp.wattxchange.app'],
+  ['BITN','Bitnet','https://bitn-exp.wattxchange.app'],
+  ['HTH','HTH','https://hth-exp.wattxchange.app'],
+  ['THA','THA','https://tha-exp.wattxchange.app'],
+  ['FLOP','Flopcoin','https://flop-exp.wattxchange.app'],
+  ['IXC','Ixcoin','https://ixc-exp.wattxchange.app'],
+  ['NU','nuChain','https://nu-exp.wattxchange.app'],
+  ['ALL','All explorers','https://explorers.wattxchange.app'],
+];
+/* a browser window onto a live page: URL bar, reload, open-in-tab, optional tabs */
+function osFrameApp(url,tabs){
+  return (body)=>{
+    body.innerHTML=`${tabs?`<div class="os-tabs">${tabs.map(([id,lbl,u])=>`<button data-u="${u}" class="${u===url?'on':''}">${lbl}</button>`).join('')}</div>`:''}
+      <div class="os-url"><span class="lock">🔒</span><input readonly value="${url}"><button data-a="reload" title="reload">⟳</button><button data-a="pop" title="open in a browser tab (use this if your wallet does not connect inside the window)">↗</button></div>
+      <iframe src="${url}" allow="clipboard-read; clipboard-write; web-share" referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
+    const fr=body.querySelector('iframe'), inp=body.querySelector('.os-url input');
+    const go=(u)=>{ fr.src=u; inp.value=u; };
+    body.querySelector('[data-a=reload]').onclick=()=>{ SFX.click(); go(inp.value); };
+    body.querySelector('[data-a=pop]').onclick=()=>{ SFX.click(); window.open(inp.value,'_blank','noopener'); };
+    body.querySelectorAll('.os-tabs [data-u]').forEach(b=>b.onclick=()=>{ SFX.click(); go(b.dataset.u);
+      body.querySelectorAll('.os-tabs [data-u]').forEach(x=>x.classList.toggle('on',x===b)); });
+  };
+}
+const OS_WEB={web:true,w:1200,h:780};
+const OS_APPS=[
+  ['miner','⛏','Miner',osAppMiner],
+  ['tunex','🎛','TuneX OC',osAppTunex],
+  ['dex','⇄','SwapinDEX',osAppDex],
+  ['wallet','👛','Wallet',osAppWallet],
+  ['wxdex','📈','WATTx DEX',osFrameApp(WXA+'/#dex'),OS_WEB],
+  ['atomic','⚛','Atomic Swap',osFrameApp(WXA+'/#defi/atomic-swap'),OS_WEB],
+  ['thor','⚡','THORChain Swap',osFrameApp(WXA+'/#defi/instant-swap'),OS_WEB],
+  ['perps','📊','Perpetuals',osFrameApp(WXA+'/#dex/perps'),OS_WEB],
+  ['explorers','🔎','Block Explorers',osFrameApp(OS_EXPLORERS[0][2],OS_EXPLORERS.map(([id,n,u])=>[id,n,u])),OS_WEB],
+  ['web','🌐','Browser',osAppWeb],
+];
+function osStartMenu(){
+  const old=$('os-start'); if(old){ old.remove(); return; }
+  SFX.click();
+  const m=osEl(`<div id="os-start"><div class="sh">APPLICATIONS</div></div>`);
+  const item=(g,nm,cls,fn)=>{ const d=osEl(`<div class="si ${cls||''}"><span class="g">${g}</span><span>${nm}</span></div>`);
+    d.onclick=e=>{ e.stopPropagation(); m.remove(); SFX.click(); fn(); }; m.appendChild(d); };
+  for(const a of OS_APPS){ const [k,g,nm,fn,opt]=a; if(k==='explorers') continue; item(g,nm,'',()=>osOpenWin(k,g,nm,fn,opt)); }
+  m.appendChild(osEl(`<div class="sh">BLOCK EXPLORERS</div>`));
+  for(const [id,n,u] of OS_EXPLORERS){
+    item(id==='ALL'?'🗂':'🔎',n+(id==='ALL'?'':' explorer'),'sub',()=>osOpenWin('explorers','🔎','Block Explorers',
+      osFrameApp(u,OS_EXPLORERS),Object.assign({},OS_WEB,{reopen:(body)=>{ const b=body.querySelector(`.os-tabs [data-u="${u}"]`); b&&b.click(); }})));
+  }
+  m.appendChild(osEl(`<div class="sh">SESSION</div>`));
+  item('⏻','Log out / exit OS','',closeOS);
+  $('os').appendChild(m);
+  const off=(e)=>{ if(!m.contains(e.target)){ m.remove(); removeEventListener('pointerdown',off,true); } };
+  setTimeout(()=>addEventListener('pointerdown',off,true),0);
+}
 /* ---------- window manager ---------- */
-function osOpenWin(k,icon,title,fill){
-  if(OS.wins[k]){ osFocus(k); return; }
+function osOpenWin(k,icon,title,fill,opt){
+  opt=opt||{};
+  if(OS.wins[k]){ osFocus(k); if(opt.reopen) opt.reopen(OS.wins[k].el.querySelector('.wbody')); return; }
   const n=Object.keys(OS.wins).length;
-  const w=osEl(`<div class="oswin" style="left:${Math.min(innerWidth-340,120+n*44)}px;top:${Math.min(innerHeight-300,46+n*36)}px;width:min(400px,94vw)">
+  const ww=opt.w||400, wh=opt.h;
+  const w=osEl(`<div class="oswin${opt.web?' web':''}" style="left:${Math.max(4,Math.min(innerWidth-Math.min(ww,innerWidth*0.96)-4,120+n*44))}px;top:${Math.max(4,Math.min(innerHeight-(wh||300)-50,46+n*36))}px;width:min(${ww}px,96vw)${wh?`;height:min(${wh}px,calc(100vh - 60px))`:''}">
     <div class="whead"><span class="wic">${icon}</span><b>${title}</b><button class="wx">✕</button></div>
     <div class="wbody"></div></div>`);
   $('os-desk').appendChild(w);
