@@ -69,7 +69,11 @@ button{font-family:inherit;cursor:pointer}
 #net:hover{border-color:var(--pur);cursor:pointer}
 #net small{color:var(--dim);font-weight:400}
 /* wallet strip */
-#wallet{position:fixed;top:56px;left:10px;display:flex;gap:6px;z-index:19;flex-wrap:wrap}
+/* the coin bar sits directly under the HUD at ANY height (--hud-h is measured
+   live) and above it in z-order, so a taller HUD can never swallow SELL clicks */
+#wallet{position:fixed;top:var(--hud-h,56px);left:10px;display:flex;gap:6px;z-index:21;flex-wrap:wrap}
+/* HUD row containers are click-through; only their actual pills/buttons catch clicks */
+#stats,#hudbtns{pointer-events:none} #stats>*,#hudbtns>*{pointer-events:auto}
 .coin{display:flex;align-items:center;gap:7px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:5px 10px;font-size:12px}
 .coin b{font-variant-numeric:tabular-nums}
 .coin .pr{color:var(--dim);font-size:10.5px}
