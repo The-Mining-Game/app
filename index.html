@@ -5596,7 +5596,7 @@ function w3GrantOwned(force){
   // Structures/peripherals aren't inventory: the Server Tower (19) is a garage
   // structure and 17/18/23 are battlestation peripherals — map them to their
   // own state or a wallet-held one is simply invisible in-game.
-  let any=false;
+  let any=false; const arrived=[];
   for(const id of WEB3CFG.ids){
     if(id===1||id===2) continue;
     const owned=W3.nfts[id]||0;
@@ -5604,8 +5604,12 @@ function w3GrantOwned(force){
     if(id===17||id===18||id===23){ const own=owned>0?1:0; if(own!==(S.periph[id]||0)){ S.periph[id]=own; any=true; } continue; }
     const avail=Math.max(0,owned-(inst[id]||0));
     if(avail!==(S.inv[id]||0)) any=true;
+    if(avail>(S.inv[id]||0)&&ITEMS[id]) arrived.push(`${avail-(S.inv[id]||0)}× ${ITEMS[id].name}`);
     S.inv[id]=avail;
   }
+  /* Loose parts only show inside a rig's or the Server Tower's workbench tray,
+     so say where they went (e.g. right after unstaking on the stake site). */
+  if(arrived.length) toast(`📦 ${arrived.join(', ')} now in your inventory — open ${S.tower?'the Server Tower (OPEN CASE — INSTALL PARTS)':'a rig'} to install`,'grn',12000);
   if(any){ renderHud(); save(); if(typeof benchSync==='function'&&benchOpen) benchSync(); rebuildAllRigs&&rebuildAllRigs(); }
 }
 /* Real transaction: free-mint the Gaming PC (id 1). On the V3 economy the item
