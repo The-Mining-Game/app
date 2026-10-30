@@ -4972,7 +4972,7 @@ function simTick(dt){ // dt seconds (fixed 0.1)
   const draw=totWatt();
   const net=CFG.nets[S.net];
   const P=curPool();
-  const hostFree=P&&P.mine; // mining on own hosted pool = free power
+  const hostFree=(P&&P.mine)||(typeof isLive==='function'&&isLive()&&W3.host); // own hosted pool (sim) or a real registered host (live) = free power
   const need=hostFree?0:draw*CFG.consumePerWatt*effMult()*dt;
   noWatt = S.watt<need;
   /* LIVE mode: the simulated block loop must NOT credit fake coins. Real earning
@@ -5508,6 +5508,12 @@ async function w3Switch(key){
     }
   }
 }
+/* Is the connected wallet a registered pool host on its current chain? Hosts mine
+   free, so the sim's "WATT reserve empty" warning must not apply to them. */
+async function w3CheckHost(){
+  try{ const c=poolCfg(); if(!c){ W3.host=false; return; }
+    W3.host=!!(await (await poolCtr('registry')).isRegistered(W3.addr)); }catch(e){}
+}
 async function w3Refresh(force){
   if(!W3.addr){
     // No wallet (locked / disconnected / not yet connected): DON'T wipe the room.
@@ -5517,6 +5523,7 @@ async function w3Refresh(force){
     renderWallet(); renderHud&&renderHud(); return;
   }
   const c=W3.chain;
+  w3CheckHost();
   W3.native=W3.watt=W3.rewards=null; W3.nfts={}; W3.rates={};
   renderWallet();
   if(!c){ return; } // unsupported chain
@@ -6464,14 +6471,20 @@ async function ocMine(rigId,poolId){
     /* rewards need somewhere to go — pop the payout-address dialog if this
        wallet never declared one for the chosen coin */
     if(!(await ocEnsurePayoutAddr(targetId))) return;
+    /* The pool HOST mines on their own pool for free: the engine accepts a
+       0-WATT session from the pool owner while their 100k registry stake is in
+       place. Everyone else deposits 24h of WATT up front. */
+    const pl=await eng.getPool(poolId);
+    const isHost=pl.owner.toLowerCase()===W3.addr.toLowerCase();
     const perHour=await rig.getWattPerHour(rigId);
-    const dep=perHour*24n; // 24h of WATT
-    if((await watt.balanceOf(W3.addr))<dep){ SFX.err(); toast(`Mining deposits 24h of WATT up front — need ${ocFmt(dep)}`,'red',8000); return; }
-    if((await watt.allowance(W3.addr,c.pools.engine))<dep)
+    const dep=isHost?0n:perHour*24n; // 24h of WATT, or nothing for the host
+    if(dep>0n&&(await watt.balanceOf(W3.addr))<dep){ SFX.err(); toast(`Mining deposits 24h of WATT up front — need ${ocFmt(dep)}`,'red',8000); return; }
+    if(dep>0n&&(await watt.allowance(W3.addr,c.pools.engine))<dep)
       await (await watt.approve(c.pools.engine,dep)).wait();
     await (await rig.approve(c.pools.engine,rigId)).wait();
     await (await eng.startMining(c.pools.rigNft,rigId,dep,poolId,targetId)).wait();
-    SFX.gen2(); toast(`⛓ RIG #${rigId} MINING ${WEB3CFG.targets[targetId]?.sym||''} on-chain — 24h WATT deposited (99% burns, host keeps 1%)`,'gold',10000);
+    SFX.gen2(); toast(isHost?`⛓ RIG #${rigId} MINING ${WEB3CFG.targets[targetId]?.sym||''} on-chain — free power: you host this pool (100k WATT staked)`
+      :`⛓ RIG #${rigId} MINING ${WEB3CFG.targets[targetId]?.sym||''} on-chain — 24h WATT deposited (99% burns, host keeps 1%)`,'gold',10000);
   }catch(e){ SFX.err(); toast('startMining failed: '+(''+(e&&(e.reason||e.message)||e)).slice(0,90),'red',9000); }
   fillChainPools();
 }
@@ -7690,6 +7703,27 @@ function osAppMiner(body){
   body.querySelectorAll('#osm-nets .os-task').forEach(b=>{
     b.onclick=()=>{ setRigNet(OS.tower?'tower':OS.rig, b.dataset.net||null); osRefresh(); };
   });
+  /* LIVE: a real rig NFT mines whatever the on-chain pools on this chain offer
+     (WTX / BITN / ALT / HTH …), not the sim's network list. One button per
+     active pool that accepts this rig's algorithm; a click starts mining there. */
+  const rg0=r();
+  if(typeof isLive==='function'&&isLive()&&rg0&&rg0.ocId!=null){
+    const box=body.querySelector('#osm-nets'); box.style.flexWrap='wrap';
+    box.innerHTML='<span style="font-size:10px;color:#8a8a90">reading pools…</span>';
+    (async()=>{
+      const c=poolCfg();
+      if(!c){ box.innerHTML='<span style="font-size:10px;color:#ffae42">connect your wallet on Polygon or Altcoinchain to mine</span>'; return; }
+      try{
+        const eng=await poolCtr('engine'); const n=Number(await eng.poolCount()); const btns=[];
+        for(let i=0;i<n;i++){ const p=await eng.getPool(i);
+          if(!p.active||!(Number(p.requiredAlgo)===255||Number(p.requiredAlgo)===rg0.algo)) continue;
+          const coins=(p.targetIds||[]).map(t=>WEB3CFG.targets[Number(t)]?.sym||'?').join('+');
+          btns.push(`<button class="os-task" data-ocpool="${i}" title="${p.name}">⛏ ${coins} <small>#${i}${p.owner.toLowerCase()===(W3.addr||'').toLowerCase()?' · free':''}</small></button>`); }
+        box.innerHTML=btns.join('')||`<span style="font-size:10px;color:#ffae42">no ${c.name} pool accepts algo ${rg0.algo} rigs</span>`;
+        box.querySelectorAll('[data-ocpool]').forEach(b=>b.onclick=()=>{ toast(`⛏ Starting RIG #${rg0.ocId} in pool #${b.dataset.ocpool} — confirm in your wallet`,'cyan',7000); ocMine(rg0.ocId,+b.dataset.ocpool); });
+      }catch(e){ box.innerHTML='<span style="font-size:10px;color:#ff6b74">could not read pools</span>'; }
+    })();
+  }
   const log=body.querySelector('#osm-log');
   let ln=0;
   const W=OS.wins.miner;
