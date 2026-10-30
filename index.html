@@ -5636,6 +5636,27 @@ async function w3Refresh(force){
   w3LiveBalances(true).catch(()=>{});  // cross-chain balances for the HUD rows
   renderWallet(); renderHud&&renderHud();  // reflect fresh on-chain WATT in the HUD immediately
 }
+/* Holdings watcher (LIVE). Unstaking/buying on the stake site, or any other
+   tab, never told the game — parts only appeared after reconnecting the
+   wallet. Every 20s (and whenever this tab regains focus) read the component
+   balances; if anything changed, run the full refresh, which mirrors desks,
+   towers and inventory and toasts what arrived. Cheap: one eth_call per id. */
+let _w3PollBusy=false;
+async function w3PollHoldings(){
+  if(_w3PollBusy||!W3.addr||!W3.chain||!W3.chain.nft||document.hidden) return;
+  if(!(typeof isLive==='function'&&isLive())) return;
+  _w3PollBusy=true;
+  try{
+    const c=W3.chain;
+    const got=await Promise.all(WEB3CFG.ids.map(id=>w3CallRaw(c.nft, WEB3CFG.sel.bal1155+encA(W3.addr)+encU(id))
+      .then(h=>h&&h!=='0x'?Number(BigInt(h)):0).catch(()=>null)));
+    if(WEB3CFG.ids.some((id,i)=>got[i]!=null&&got[i]!==(W3.nfts[id]||0))) await w3Refresh(true);
+  }catch(e){}
+  finally{ _w3PollBusy=false; }
+}
+setInterval(()=>{ w3PollHoldings(); },20000);
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden) w3PollHoldings(); });
+window.addEventListener('focus',()=>{ w3PollHoldings(); });
 /* Components staked in the MiningGame staker are ESCROWED — balanceOf can't see
    them, which reads as "you own nothing" in the NFT mirror. Read the positions
    so the wallet panel can show them and unstake without leaving the game. */
