@@ -7477,6 +7477,23 @@ function renderRigPanel(){
    log into its OS, unlike every Gaming PC rig. */
 /* 5×4 picker mirroring the rack (top tier first). Click a bay to move the
    selected tower there — an occupied bay swaps the two towers. */
+/* CPU quick-fill: shows which CPUs are loose in inventory and fills empty
+   sockets with the best ones — this tower, or every tower at once — so a big
+   rack doesn't need 2 drags per case. */
+function towerCpusFree(){ return CPU_IDS.filter(id=>(S.inv[id]||0)>0).sort((a,b)=>ITEMS[b].hash-ITEMS[a].hash); }
+function towerFillCpus(t){ let n=0;
+  for(const id of towerCpusFree()) while((S.inv[id]||0)>0&&t.cpus.length<TOWER_MAXCPU){ t.cpus.push(id); S.inv[id]--; n++; }
+  return n; }
+function towerCpuFillHtml(t){
+  const free=towerCpusFree();
+  const list=free.length?free.map(id=>`<b>${ITEMS[id].name}</b> ×${S.inv[id]}`).join(' · '):'none';
+  const open=TOWER_MAXCPU-t.cpus.length;
+  const allOpen=towerAll().reduce((a,x)=>a+Math.max(0,TOWER_MAXCPU-x.cpus.length),0);
+  return `<div style="margin:6px 0"><small style="color:var(--dim)">CPUs in inventory: ${list}</small>
+    <div class="rowbtns" style="margin-top:4px">
+      <button class="hbtn gold" id="tp-fillcpu" ${free.length&&open?'':'disabled'}>⚡ FILL THIS TOWER (${open} free socket${open===1?'':'s'})</button>
+      ${(S.tower|0)>1?`<button class="hbtn" id="tp-fillall" ${free.length&&allOpen?'':'disabled'}>⚡ FILL ALL TOWERS (${allOpen} sockets)</button>`:''}</div></div>`;
+}
 function towerBayGridHtml(){
   const b=towerBaysNorm(), me=b[S.towerSel]; let cells='';
   for(let row=RACK.rows-1;row>=0;row--) for(let col=0;col<RACK.cols;col++){
@@ -7509,6 +7526,7 @@ function renderTowerPanel(){
     <div class="wearrow"><small>WEAR</small><div class="wearbar"><i style="width:${t.wear.toFixed(1)}%;background:${wearCol}"></i></div><b style="color:${wearCol}">${t.wear.toFixed(0)}%</b>
       ${t.wear>=1?`<button class="hbtn" id="tp-fix">🔧 REPAIR ${fmt(repairCost(t))} ⚡</button>`:''}</div>
     <div class="rowbtns"><button class="hbtn ${t.on?'':'gold'}" id="tp-pwr">${t.on?'🔋 POWER OFF — stake mode':'🔌 POWER ON — mine'}</button><button class="hbtn gold" id="tp-bench">🔧 OPEN CASE — INSTALL PARTS</button></div>
+    ${towerCpuFillHtml(t)}
     ${(S.tower|0)>1||towerBaysNorm()[S.towerSel]>=0?towerBayGridHtml():''}
     <div class="rowbtns"><button class="hbtn" id="tp-move">✋ MOVE / PLACE ${towerBaysNorm()[S.towerSel]>=0?'THE SERVER RACK':'THIS TOWER'}</button></div>
     <div class="rowbtns"><button class="hbtn accent" id="tp-os">💻 LOG IN — TOWER OS</button><button class="hbtn gold" id="tp-shop">🛒 SHOP</button><button class="hbtn" id="tp-close">CLOSE</button></div>`;
@@ -7516,6 +7534,13 @@ function renderTowerPanel(){
   $('tp-pwr').onclick=()=>togglePower('tower');
   const fx=$('tp-fix'); if(fx) fx.onclick=()=>repairRig('tower');
   $('tp-bench').onclick=()=>openTowerBench();
+  const fc=$('tp-fillcpu'); if(fc) fc.onclick=()=>{ const n=towerFillCpus(S.towerRig);
+    SFX.install(); toast(n?`⚡ ${n} CPU${n>1?'s':''} installed in Server Tower #${S.towerSel+1}`:'No free CPUs or sockets','grn',5000);
+    syncTowerGlow(); syncRackLeds(); renderHud(); save(); renderTowerPanel(); };
+  const fa=$('tp-fillall'); if(fa) fa.onclick=()=>{ let n=0, k=0;
+    for(const tw of towerAll()){ const m=towerFillCpus(tw); if(m){ n+=m; k++; } }
+    SFX.install(); toast(n?`⚡ ${n} CPUs installed across ${k} tower${k>1?'s':''}`+(towerCpusFree().length?'':' — CPU inventory now empty'):'No free CPUs or sockets','grn',7000);
+    syncTowerGlow(); syncRackLeds(); renderHud(); save(); renderTowerPanel(); };
   document.querySelectorAll('#rigp [data-tbay]').forEach(b=>b.onclick=()=>{ const bay=+b.dataset.tbay;
     towerSetBay(S.towerSel,bay); SFX.click();
     toast(bay<0?`🗄 Server Tower #${S.towerSel+1} now stands on the floor`:`🗄 Server Tower #${S.towerSel+1} → tier ${Math.floor(bay/RACK.cols)+1}, bay ${bay%RACK.cols+1}`,'grn',5000);
