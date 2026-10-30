@@ -3145,23 +3145,41 @@ function powerCapAddAt(i){ const a=CFG.powerCapAdd; return i<a.length?a[i]:Math.
 function coolCoeffAt(lv){ const a=CFG.coolCoeff; return lv<a.length?a[lv]:a[a.length-1]*Math.pow(CFG.coolGrowth||0.75,lv-a.length+1); }
 /* Server Tower is a built rig too: its dual-CPU board (up to 2 CPUs + 6 GPUs)
    contributes hash/watt/stake just like a Gaming PC. Guard on ownership. */
-function towerRigOn(){ const t=S.tower&&S.towerRig; return !!(t&&t.on!==0); }
+/* MULTIPLE TOWERS (2026-10-29): S.tower is now a COUNT (legacy saves hold 1).
+   S.towerRigs[i] is tower i's build; S.towerRig is the SELECTED one, which every
+   panel/bench/OS screen edits. Tower 0 stands on its own; towers 1+ live in the
+   server rack beside it. towerNorm() re-links the selected entry after a JSON
+   load (save/load splits the shared object into two equal copies). */
+function towerNorm(){
+  if(!S) return [];
+  if(!Array.isArray(S.towerRigs)) S.towerRigs=[S.towerRig||freshTowerRig()];
+  const n=Math.max(1,S.tower|0);
+  while(S.towerRigs.length<n) S.towerRigs.push(freshTowerRig());
+  S.towerSel=Math.min(Math.max(0,S.towerSel|0),n-1);
+  if(S.towerRig&&S.towerRigs[S.towerSel]!==S.towerRig) S.towerRigs[S.towerSel]=S.towerRig;
+  S.towerRig=S.towerRigs[S.towerSel];
+  return S.towerRigs;
+}
+function towerAll(){ return (S&&S.tower)?towerNorm().slice(0,S.tower|0):[]; }
+function towerSelect(i){ towerNorm(); S.towerSel=Math.min(Math.max(0,i|0),Math.max(1,S.tower|0)-1); S.towerRig=S.towerRigs[S.towerSel]; }
+function towerRigOn(t){ if(t===undefined) t=S.towerRig; return !!(S.tower&&t&&t.on!==0); }
 /* same overclock + wear/crash formula as rigHash/rigWatt — the tower has its
    own TuneX and can crash/wear down exactly like a desk rig, just with no
    ITEMS[1] baseline (there's no "Gaming PC" chassis to it). */
-function towerHash(){ const t=towerRigOn()&&S.towerRig; if(!t||t.crashT>0||t.wear>=100) return 0;
+function towerHash(t){ if(t===undefined) t=S.towerRig; if(!towerRigOn(t)) return 0; if(t.crashT>0||t.wear>=100) return 0;
   let h=0; for(const c of t.cpus) h+=ITEMS[c].hash; for(const g of t.gpus) h+=ITEMS[g].hash;
   return h*ocHashMult(t)*(1-0.5*(t.wear||0)/100); }
-function towerWatt(){ const t=towerRigOn()&&S.towerRig; if(!t) return 0;
+function towerWatt(t){ if(t===undefined) t=S.towerRig; if(!towerRigOn(t)) return 0;
   let w=0; for(const c of t.cpus) w+=ITEMS[c].watt; for(const g of t.gpus) w+=ITEMS[g].watt;
   return (t.crashT>0||t.wear>=100) ? w*0.25 : w*ocWattMult(t); }
-function towerValue(){ const t=S.towerRig; if(!t) return 0;
+function towerValue(t){ if(t===undefined) t=S.towerRig; if(!t) return 0;
   let v=0; for(const c of t.cpus) v+=ITEMS[c].price; for(const g of t.gpus) v+=ITEMS[g].price; return v; }
-function towerCompSW(){ const t=S.tower&&S.towerRig; if(!t) return 0; let s=0; for(const c of t.cpus) s+=ITEMS[c].sw; for(const g of t.gpus) s+=ITEMS[g].sw; return s; }
-function totHash(){ return (S.rigs.reduce((a,r)=>a+rigHash(r),0)+towerHash()) * Math.pow(CFG.gen2Mult,S.gen-1); }
-function totWatt(){ return S.rigs.reduce((a,r)=>a+rigWatt(r),0)+towerWatt(); }
-function totSW(){ return S.rigs.reduce((a,r)=>a+rigSW(r),0) + towerCompSW() + (S.badge?ITEMS[2].sw:0) + (S.tower?ITEMS[19].sw:0); }
-function totSWStake(){ return S.rigs.reduce((a,r)=>a+rigSW(r)*(r.on?0.25:1),0) + towerCompSW()*(S.towerRig&&S.towerRig.on?0.25:1) + (S.badge?ITEMS[2].sw:0) + (S.tower?ITEMS[19].sw:0); }
+function towerCompSW(t){ if(t===undefined) t=S.towerRig; if(!S.tower||!t) return 0; let s=0; for(const c of t.cpus) s+=ITEMS[c].sw; for(const g of t.gpus) s+=ITEMS[g].sw; return s; }
+const towersSum=f=>towerAll().reduce((a,t)=>a+f(t),0);
+function totHash(){ return (S.rigs.reduce((a,r)=>a+rigHash(r),0)+towersSum(towerHash)) * Math.pow(CFG.gen2Mult,S.gen-1); }
+function totWatt(){ return S.rigs.reduce((a,r)=>a+rigWatt(r),0)+towersSum(towerWatt); }
+function totSW(){ return S.rigs.reduce((a,r)=>a+rigSW(r),0) + towersSum(towerCompSW) + (S.badge?ITEMS[2].sw:0) + (S.tower|0)*ITEMS[19].sw; }
+function totSWStake(){ return S.rigs.reduce((a,r)=>a+rigSW(r)*(r.on?0.25:1),0) + towersSum(t=>towerCompSW(t)*(t.on?0.25:1)) + (S.badge?ITEMS[2].sw:0) + (S.tower|0)*ITEMS[19].sw; }
 function rigValue(r){ let v=ITEMS[1].price; if(r.cpu) v+=ITEMS[r.cpu].price; if(r.asic) v+=ITEMS[r.asic].price; if(r.frame) v+=ITEMS[14].price; for(const g of r.gpus) v+=ITEMS[g].price; return v; }
 function repairCost(r){ const v=Array.isArray(r.cpus)?towerValue():rigValue(r); return Math.ceil(v*0.18*(r.wear||0)/100); }
 function stakeMult(){ return S.tower?CFG.towerStakeMult:1; }
@@ -3360,7 +3378,7 @@ function makeFloorTex(){
     x.beginPath(); x.moveTo(0,i*32); x.lineTo(1024,i*32); x.stroke(); }
   return ctex(c);
 }
-const ROOM = {W:20, D:16, H:7.2};
+const ROOM = {W:20, D:16, H:13.5};   // walls tall enough for the 4-tier server rack
 const floorTex = makeFloorTex(); floorTex.wrapS=floorTex.wrapT=THREE.RepeatWrapping; floorTex.repeat.set(2.4,2);
 const floor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.W+6,ROOM.D+6),
   new THREE.MeshStandardMaterial({map:floorTex, roughness:.92, metalness:.15}));
@@ -3960,7 +3978,7 @@ function makeProcTower(){
 function setTowerOwned(own){
   /* re-shown after a world switch or a reset: the tower is the same object but
      its build belongs to the new save, so resync what is inside it */
-  if(towerVis){ towerVis.visible=own; syncTowerBuild(); return; }
+  if(towerVis){ towerVis.visible=own; syncTowerBuild(); syncRack(); return; }
   if(!own) return;
   towerVis=new THREE.Group();
   if(PROTO.tower){
@@ -3987,13 +4005,81 @@ function setTowerOwned(own){
   towerVis.rotation.y=(S&&S.towerRot!=null)?S.towerRot:0.35;
   scene.add(towerVis);
   syncTowerGlow();
+  syncRack();
+}
+/* ---------- SERVER RACK: towers 2+ ----------
+   Tower #1 stands on its own; every extra tower goes into a full-size server
+   rack against the right wall — each bay sized to hold a
+   server case at its REAL size, not a miniature (20 bays: 5 wide × 4 tiers).
+   The rack appears once you own a second tower; empty bays stay open. Each filled bay has its own click box,
+   so any tower can be picked, powered, tuned and built on its workbench. */
+const RACK={cols:5, rows:4, bw:2.4, bh:3.1, bd:2.5, base:0.15};
+const TOWER_MAX=1+RACK.cols*RACK.rows;
+let rackVis=null;
+function makeRackFrame(){
+  const g=new THREE.Group(), W=RACK.cols*RACK.bw, H=RACK.base+RACK.rows*RACK.bh+0.1, D=RACK.bd;
+  const post=new THREE.MeshStandardMaterial({color:0x2a2f45, roughness:0.45, metalness:0.85});
+  const rail=new THREE.MeshStandardMaterial({color:0x1a1e30, roughness:0.5, metalness:0.8});
+  for(let c=0;c<=RACK.cols;c++) for(const z of [-D/2,D/2]){
+    const m=new THREE.Mesh(new THREE.BoxGeometry(0.1,H,0.1),post); m.position.set(-W/2+c*RACK.bw,H/2,z); g.add(m); }
+  for(let r=0;r<=RACK.rows;r++){ const y=RACK.base+r*RACK.bh;
+    const sh=new THREE.Mesh(new THREE.BoxGeometry(W+0.1,0.08,D),rail); sh.position.y=y; g.add(sh); }
+  const back=new THREE.Mesh(new THREE.BoxGeometry(W,H,0.04),new THREE.MeshStandardMaterial({color:0x0c0e18, roughness:0.8, metalness:0.4}));
+  back.position.set(0,H/2,-D/2); g.add(back);
+  const cap=new THREE.Mesh(new THREE.BoxGeometry(W*0.96,0.06,0.04),new THREE.MeshBasicMaterial({color:0x2ee6d6}));
+  cap.position.set(0,H-0.05,D/2+0.06); g.add(cap);
+  const L=new THREE.PointLight(0x2ee6d6, 30, 12); L.position.set(0,H*0.55,D/2+2); g.add(L);
+  g.userData.W=W; g.userData.H=H; return g;
+}
+function syncRack(){
+  if(typeof scene==='undefined') return;
+  const bays=Math.max(0,Math.min(RACK.cols*RACK.rows,(S&&S.tower|0)-1));
+  if(rackVis){ scene.remove(rackVis); rackVis=null; }
+  if(!bays||!towerVis||!towerVis.visible) return;
+  rackVis=makeRackFrame();
+  const W=rackVis.userData.W, mdl=towerVis.children[0], shells=towerVis.userData.shell||[];
+  // own materials, reset to the CLOSED case (tower #1's shell may be smoked glass)
+  const own=m=>{ const n=m.clone(); const sh=shells.find(x=>x.mat===m); if(sh){ n.transparent=sh.t; n.opacity=sh.o; n.depthWrite=sh.w; } return n; };
+  for(let i=0;i<bays;i++){
+    const col=i%RACK.cols, row=Math.floor(i/RACK.cols);
+    const bay=new THREE.Group();
+    bay.position.set(-W/2+RACK.bw*(col+0.5), RACK.base+0.04+row*RACK.bh, 0);
+    if(mdl){ const c=mdl.clone(true);
+      c.traverse(o=>{ if(o.material) o.material=Array.isArray(o.material)?o.material.map(own):own(o.material); o.renderOrder=0; });
+      bay.add(c); }                                  // full size — same scale as tower #1
+    const led=new THREE.Mesh(new THREE.BoxGeometry(0.6,0.05,0.03),new THREE.MeshBasicMaterial({color:0x3dff8a}));
+    led.position.set(0,0.1,RACK.bd/2+0.04); bay.add(led); bay.userData.led=led;
+    const hit=new THREE.Mesh(new THREE.BoxGeometry(RACK.bw-0.1,RACK.bh-0.1,RACK.bd),new THREE.MeshBasicMaterial({visible:false,depthWrite:false}));
+    hit.position.y=RACK.bh/2; hit.userData.rackBay=i+1; bay.add(hit);
+    rackVis.add(bay);
+  }
+  // against the right wall, facing into the room
+  rackVis.position.set(ROOM.W/2-RACK.bd/2-0.15, 0, 0);
+  rackVis.rotation.y=-Math.PI/2;
+  scene.add(rackVis);
+  syncRackLeds();
+}
+/* bay LED: green mining, gold powered-off (staking), red crashed/broken */
+function syncRackLeds(){
+  if(!rackVis) return; const ts=towerAll();
+  rackVis.children.forEach(b=>{ const led=b.userData&&b.userData.led; if(!led) return;
+    const bi=b.children.find(x=>x.userData&&x.userData.rackBay)?.userData.rackBay; const t=ts[bi]; if(!t) return;
+    led.material.color.setHex(t.crashT>0||t.wear>=100?0xff5b5b:t.on?0x3dff8a:0xffb020); });
+}
+function rackHitAt(e){
+  if(!rackVis) return -1;
+  const r=canvas.getBoundingClientRect();
+  mouse.x=((e.clientX-r.left)/r.width)*2-1; mouse.y=-((e.clientY-r.top)/r.height)*2+1;
+  ray.setFromCamera(mouse,cam);
+  for(const h of ray.intersectObject(rackVis,true)){ let o=h.object; while(o){ if(o.userData&&o.userData.rackBay) return o.userData.rackBay; o=o.parent; } }
+  return -1;
 }
 /* brighten the tower's glow with how much hardware is installed in it */
 function syncTowerGlow(){
   if(typeof towerVis==='undefined'||!towerVis||!towerVis.userData.glow) return;
-  const load=(typeof towerHash==='function')?towerHash():0;
+  const load=(typeof towerHash==='function'&&S)?towerHash(towerNorm()[0]):0;
   towerVis.userData.glow.intensity=26+Math.min(50,load*0.15);
-  syncTowerBuild();
+  syncTowerBuild(); syncRackLeds();
 }
 /* ---------- the Server Tower's build, shown inside the case ----------
    The tower is a real rig — up to 2 CPUs and 6 GPUs on its dual-CPU board —
@@ -4135,7 +4221,7 @@ function placeTowerCpus(parent, ids, bay, board, size){
 }
 function syncTowerBuild(){
   if(typeof towerVis==='undefined'||!towerVis) return;
-  const t=(typeof S!=='undefined'&&S)?S.towerRig:null;
+  const t=(typeof S!=='undefined'&&S)?towerNorm()[0]:null;
   const gpus=(t&&t.gpus)||[], cpus=(t&&t.cpus)||[];
   const filled=gpus.length+cpus.length;
   if(towerVis.userData.build){ towerVis.remove(towerVis.userData.build); towerVis.userData.build=null; }
@@ -4961,7 +5047,7 @@ function simTick(dt){ // dt seconds (fixed 0.1)
       if(OS.open&&OS.rig===ri) osRefresh();
     }
   });
-  towerSimStep(dt);
+  towerAll().forEach(t=>towerSimStep(dt,t));
   // stake income — DEMO only. In live the real drip comes from the on-chain
   // staker, and S.watt is purchased upgrade CREDIT: the sim must not mint it.
   if(!(typeof isLive==='function'&&isLive())){
@@ -4979,7 +5065,7 @@ function simTick(dt){ // dt seconds (fixed 0.1)
      comes from the on-chain Pool Hub (startMining on the real engine → PayoutHub
      → operator daemon pays real coin). So run the sim earning only in DEMO. */
   const simEarn = !(typeof isLive==='function' && isLive());
-  if(simEarn && !noWatt && (S.rigs.length||towerRigOn())){
+  if(simEarn && !noWatt && (S.rigs.length||towerAll().some(towerRigOn))){
     S.watt-=need;
     if(need>0){ S.burned+=need*(1-CFG.hostBurnCut); } // 1% of burn goes to pool host, rest → 0x000…dEaD
     const hf=heatFactor(), pf=powerFactor();
@@ -4996,8 +5082,8 @@ function simTick(dt){ // dt seconds (fixed 0.1)
     const byNet={};
     S.rigs.forEach((r,ri)=>{ const nk=CFG.nets[r.net]?r.net:S.net;
       (byNet[nk]??={hash:0,rigs:[]}); byNet[nk].hash+=rigHash(r)*g2; byNet[nk].rigs.push(ri); });
-    if(towerRigOn()){ const nk=CFG.nets[S.towerRig.net]?S.towerRig.net:S.net;
-      (byNet[nk]??={hash:0,rigs:[]}); byNet[nk].hash+=towerHash()*g2; byNet[nk].rigs.push('tower'); }
+    towerAll().forEach(t=>{ if(!towerRigOn(t)) return; const nk=CFG.nets[t.net]?t.net:S.net;
+      (byNet[nk]??={hash:0,rigs:[]}); byNet[nk].hash+=towerHash(t)*g2; byNet[nk].rigs.push('tower'); });
     for(const nk in byNet){
       const nx=CFG.nets[nk];
       const lam=byNet[nk].hash*nx.lam*hf*pf*luckMult()/difficulty()*spd*(S.altHybrid&&nk==='alt'?0.5:1);
@@ -5034,12 +5120,12 @@ function simTick(dt){ // dt seconds (fixed 0.1)
    above), just addressed differently: no SLOTS[r.slot]/rigVis[ri] (the tower
    isn't in that array), so particle bursts use the tower's own world position,
    and the "which rig's OS is open" check is OS.tower instead of OS.rig===ri. */
-function towerSimStep(dt){
-  const t=S.towerRig; if(!t) return;
+function towerSimStep(dt,t){
+  if(t===undefined) t=S.towerRig; if(!t) return;
   const burstPos=()=>{ if(typeof towerVis==='undefined'||!towerVis||!towerVis.visible) return null;
     return towerVis.position.clone().add(new THREE.Vector3(0,2.2,0)); };
   if(t.crashT>0){ t.crashT-=dt; if(t.crashT<=0){ t.crashT=0; toast('🗄 Server Tower auto-rebooted','cyan'); renderHud(); } return; }
-  if(t.on && t.wear<100 && towerHash()>0){
+  if(t.on && t.wear<100 && towerHash(t)>0){
     const o=t.oc||{c:0,m:0};
     let wpm=0.05 + (o.c+o.m)*0.09 + (S.temp>80?0.5:0) + (S.temp>95?1.6:0);
     t.wear=Math.min(100, t.wear + wpm*dt/60);
@@ -5189,7 +5275,7 @@ function buyItem(id){
     toast('🏅 GENESIS BADGE acquired! +10% luck · +10% efficiency','gold');
   } else if(it.comp==='Peripheral'){ S.periph[id]=1; rebuildAllRigs();
     toast(`🖱 ${it.name} — +2% luck on every desk${periphCount()===3?' · FULL BATTLESTATION SET +3%':''}`, periphCount()===3?'gold':'grn');
-  } else if(id===19){ S.tower=1; if(!S.towerRig) S.towerRig=freshTowerRig(); setTowerOwned(true);
+  } else if(id===19){ S.tower=Math.min(TOWER_MAX,(S.tower|0)+1); towerNorm(); setTowerOwned(true); syncRack();
     burst(new THREE.Vector3(5.4,2.2,-ROOM.D/2+1.9),40,partMatCyan,3.5);
     toast('🗄 SERVER TOWER online — +40 stake weight · +20% stake income. CLICK it to open its dual-CPU board and install up to 2 CPUs + 6 GPUs.','gold',9000);
   } else { S.inv[id]++; toast(`${it.name} added to inventory — open a rig to install`,'grn'); }
@@ -5586,6 +5672,8 @@ function w3GrantOwned(force){
     if(r.frame) inst[14]=(inst[14]||0)+1;
     for(const g of r.gpus) inst[g]=(inst[g]||0)+1;
   }
+  // parts bolted into ANY tower are installed too — otherwise they'd be counted twice
+  for(const t of towerAll()){ for(const x of t.cpus) inst[x]=(inst[x]||0)+1; for(const x of t.gpus) inst[x]=(inst[x]||0)+1; }
   // Gaming PC → one desk rig per PC you own on-chain (live rigs only — live
   // mode is its own world, so demo desks can no longer absorb these)
   // LIVE: your mining-rig NFTs ARE your farm — mirror them into the room (parts + placement).
@@ -5600,7 +5688,7 @@ function w3GrantOwned(force){
   for(const id of WEB3CFG.ids){
     if(id===1||id===2) continue;
     const owned=W3.nfts[id]||0;
-    if(id===19){ const own=owned>0?1:0; if(own!==(S.tower?1:0)){ S.tower=own; setTowerOwned(!!own); any=true; } continue; }
+    if(id===19){ const own=Math.min(owned,TOWER_MAX); if(own!==(S.tower|0)){ S.tower=own; towerNorm(); setTowerOwned(!!own); syncRack(); any=true; } continue; }
     if(id===17||id===18||id===23){ const own=owned>0?1:0; if(own!==(S.periph[id]||0)){ S.periph[id]=own; any=true; } continue; }
     const avail=Math.max(0,owned-(inst[id]||0));
     if(avail!==(S.inv[id]||0)) any=true;
@@ -7303,13 +7391,13 @@ function renderRigPanel(){
 function renderTowerPanel(){
   const p=$('rigp');
   if(!selTower||!S.tower||!S.towerRig){ p.classList.remove('open'); return; }
-  const t=S.towerRig;
+  const t=S.towerRig; syncRackLeds();
   p.classList.add('open');
   const hf=heatFactor(), pf=powerFactor();
   const eff=Math.round(hf*pf*100);
   const ocOn=t.oc&&(t.oc.c+t.oc.m)>0, crashed=t.crashT>0, broken=t.wear>=100;
   const wearCol=t.wear>=100?'var(--red)':t.wear>=60?'#ffae42':t.wear>=30?'var(--gold)':'var(--grn)';
-  p.innerHTML=`<h2>🗄 Server Tower ${broken?'<span style="color:var(--red);font-size:12px">🔥 BROKEN</span>':crashed?'<span style="color:var(--red);font-size:12px">💥 CRASHED</span>':!t.on?'<span style="color:var(--gold);font-size:12px">🔋 STAKING</span>':ocOn?'<span style="color:var(--cyan);font-size:12px">🎛 OC +'+Math.round((ocHashMult(t)-1)*100)+'%</span>':''}</h2>
+  p.innerHTML=`<h2>🗄 Server Tower${(S.tower|0)>1?' #'+(S.towerSel+1)+' of '+S.tower+(S.towerSel?' <small style="color:var(--dim);font-size:11px">· rack bay '+S.towerSel+'</small>':''):''} ${broken?'<span style="color:var(--red);font-size:12px">🔥 BROKEN</span>':crashed?'<span style="color:var(--red);font-size:12px">💥 CRASHED</span>':!t.on?'<span style="color:var(--gold);font-size:12px">🔋 STAKING</span>':ocOn?'<span style="color:var(--cyan);font-size:12px">🎛 OC +'+Math.round((ocHashMult(t)-1)*100)+'%</span>':''}</h2>
     <div class="sub">Dual-CPU server board · ${t.cpus.length}/2 CPUs · ${t.gpus.length}/6 GPUs</div>
     <div class="stats2">
       <div class="st2"><small>HASHPOWER</small><b style="color:var(--cyan)">${Math.round(towerHash())}</b></div>
@@ -8060,7 +8148,7 @@ canvas.addEventListener('pointermove',e=>{
   const h=pick(e);
   const hr=(typeof h==='number')?h:-1;
   if(hr!==hoverRig){ hoverRig=hr; if(typeof updatePoolPill==='function') updatePoolPill(); }
-  canvas.style.cursor=(hr>=0||(h&&h.chair!==undefined)||(hr<0&&towerHitAt(e)))?'pointer':'default';
+  canvas.style.cursor=(hr>=0||(h&&h.chair!==undefined)||(hr<0&&(towerHitAt(e)||rackHitAt(e)>0)))?'pointer':'default';
 });
 canvas.addEventListener('pointerdown',e=>{ if(moveSel){ if(e.buttons&1) moveDragTo(e); return; } pdown=[e.clientX,e.clientY]; });
 canvas.addEventListener('pointerup',e=>{
@@ -8070,7 +8158,8 @@ canvas.addEventListener('pointerup',e=>{
   if(dx*dx+dy*dy>36) return;
   /* click the Server Tower → its panel (stats/power/OS/move/shop), same first
      stop a Gaming PC gets — INSTALL PARTS is one button away, not automatic */
-  if(towerHitAt(e)){ selRig=-1; selTower=true; SFX.click(); renderRigPanel(); return; }
+  { const rb=rackHitAt(e); if(rb>0){ towerSelect(rb); selRig=-1; selTower=true; SFX.click(); renderRigPanel(); return; } }
+  if(towerHitAt(e)){ towerSelect(0); selRig=-1; selTower=true; SFX.click(); renderRigPanel(); return; }
   const h=pick(e);
   if(h&&h.chair!==undefined){ sitDown(h.chair); return; }
   if(SIT.on){ standUp(); return; }
@@ -8135,7 +8224,7 @@ function endMove(persist){
   if(!moveSel) return;
   const m=moveSel;
   if(persist){
-    if(m.kind==='tower'){ S.towerPos={x:m.x,y:m.y,z:m.z}; S.towerRot=m.rot; }
+    if(m.kind==='tower'){ S.towerPos={x:m.x,y:m.y,z:m.z}; S.towerRot=m.rot; syncRack(); }
     else if(S.rigs[m.i]){ S.rigs[m.i].pos={x:m.x,y:m.y,z:m.z}; S.rigs[m.i].rot=m.rot; }
     save&&save();
   } else {
@@ -8479,7 +8568,7 @@ function frame(t){
     }
   });
   if(typeof towerVis!=='undefined'&&towerVis&&towerVis.visible&&towerVis.userData.fans)
-    spinFans(towerVis.userData.fans, dt, !noWatt && towerHash()>0);
+    spinFans(towerVis.userData.fans, dt, !noWatt && towerHash(towerNorm()[0])>0);
   // rings pulse
   const pt=t/1000;
   rings.forEach((rg,i)=>{ if(!rg||!rg.visible) return;
