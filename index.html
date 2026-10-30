@@ -4053,9 +4053,11 @@ function syncRack(){
     hit.position.y=RACK.bh/2; hit.userData.rackBay=i+1; bay.add(hit);
     rackVis.add(bay);
   }
-  // against the right wall, facing into the room
-  rackVis.position.set(ROOM.W/2-RACK.bd/2-0.15, 0, 0);
-  rackVis.rotation.y=-Math.PI/2;
+  // default: against the right wall, facing into the room — unless the player
+  // has moved it (S.rackPos / S.rackRot from the move editor)
+  if(S&&S.rackPos) rackVis.position.set(S.rackPos.x, S.rackPos.y||0, S.rackPos.z);
+  else rackVis.position.set(ROOM.W/2-RACK.bd/2-0.15, 0, 0);
+  rackVis.rotation.y=(S&&S.rackRot!=null)?S.rackRot:-Math.PI/2;
   scene.add(rackVis);
   syncRackLeds();
 }
@@ -5662,11 +5664,12 @@ async function w3Unstake(idx){
    available-to-install(id) = balanceOf(you, id) − how many are already fitted in
    your rigs. This is a live sync (re-runs every wallet refresh), so swaps, buys
    and migrations show up immediately — no one-time grant, no demo items counted. */
-function w3GrantOwned(force){
+function w3GrantOwned(force,noSync){
   if(!W3.addr||!W3.chain||!(typeof isLive==='function'&&isLive())) return;
   // count components already installed across every rig
   const inst={};
   for(const r of S.rigs){
+    if(r.ocId!=null) continue;   // rig-NFT desks show placeholder parts, not your components
     if(r.cpu) inst[r.cpu]=(inst[r.cpu]||0)+1;
     if(r.asic) inst[r.asic]=(inst[r.asic]||0)+1;
     if(r.frame) inst[14]=(inst[14]||0)+1;
@@ -5677,7 +5680,7 @@ function w3GrantOwned(force){
   // Gaming PC → one desk rig per PC you own on-chain (live rigs only — live
   // mode is its own world, so demo desks can no longer absorb these)
   // LIVE: your mining-rig NFTs ARE your farm — mirror them into the room (parts + placement).
-  if(typeof syncLiveRigsFromChain==='function') syncLiveRigsFromChain(force);
+  if(!noSync&&typeof syncLiveRigsFromChain==='function') syncLiveRigsFromChain(force);
   // Genesis Badge
   if((W3.nfts[2]||0)>0 && !S.badge){ S.badge=1; setBadgeOwned(true); }
   // every other component: set inventory to (owned − installed).
@@ -6110,21 +6113,38 @@ async function syncLiveRigsFromChain(force){
       }catch(e){}
     }
     const built=[];
-    for(let i=0;i<ids.length && i<slots.length;i++){
+    const nRig=Math.min(ids.length,slots.length);
+    for(let i=0;i<nRig;i++){
       let hash=1200, algo=0;
       try{ const t=await rig.getRigTraits(ids[i].id); hash=Number(t.hashRate)||1200; algo=Number(t.algorithm); }catch(e){}
       const ngpu=Math.max(1,Math.min(8,Math.round(hash/400)));
       built.push({ ocId:ids[i].id, algo, staked:ids[i].staked, slot:slots[i], cpu:3, gpus:Array(ngpu).fill(5), asic:0, frame:0, oc:{c:0,m:0}, crashT:0, on:1, wear:0 });
     }
-    S.overCap = Math.max(0, ids.length - slots.length);
+    /* Gaming PCs (component id 1) held in the wallet are DESKS too: one desk per
+       PC, after the rig-NFT desks. They keep whatever parts you bolted in (saved
+       per desk), so CPUs/GPUs from inventory have somewhere to go. A PC that
+       leaves the wallet (staked / sold) drops its desk and its parts go back to
+       inventory on the next sync. These desks don't mine on-chain — only rig
+       NFTs can join a real pool — but they show and stake like your hardware. */
+    const nPc=Math.max(0,Math.min(W3.nfts[1]|0, slots.length-nRig));
+    const oldPc=(S.rigs||[]).filter(r=>r&&r.pc);
+    for(let i=0;i<nPc;i++){
+      const o=oldPc[i]||{};
+      built.push({ pc:true, slot:slots[nRig+i], cpu:o.cpu||0, gpus:Array.isArray(o.gpus)?o.gpus:[], asic:o.asic||0, frame:o.frame||0,
+        oc:o.oc||{c:0,m:0}, crashT:o.crashT||0, on:o.on??1, wear:o.wear||0, net:o.net||null, pos:o.pos, rot:o.rot });
+    }
+    S.overCap = Math.max(0, ids.length - slots.length) + Math.max(0,(W3.nfts[1]|0)-Math.max(0,slots.length-nRig));
     // Only replace the room when the chain ACTUALLY answered (held and/or staked
     // read succeeded). If both reads threw — RPC hiccup, missing contract — leave
     // the saved rigs untouched so a transient error never blanks a real farm.
     // A genuinely empty wallet (both reads OK, zero rigs) still clears the room,
     // which is what an account switch to an empty wallet should do.
     if(heldOk || stakedOk){
+      const hadPc=(S.rigs||[]).filter(r=>r&&r.pc).length, nowPc=built.filter(r=>r.pc).length;
       S.rigs=built;
       if(typeof rebuildAllRigs==='function') rebuildAllRigs();
+      if(nowPc>hadPc) toast(`🖥 ${nowPc-hadPc} Gaming PC desk${nowPc-hadPc>1?'s':''} set up from your wallet — click one to install CPUs/GPUs`,'grn',10000);
+      w3GrantOwned(false,true);   // re-count inventory now that desk parts are known (no re-sync)
       if(typeof renderHud==='function') renderHud();
       if(typeof save==='function') save();
     }
@@ -7408,13 +7428,13 @@ function renderTowerPanel(){
     <div class="wearrow"><small>WEAR</small><div class="wearbar"><i style="width:${t.wear.toFixed(1)}%;background:${wearCol}"></i></div><b style="color:${wearCol}">${t.wear.toFixed(0)}%</b>
       ${t.wear>=1?`<button class="hbtn" id="tp-fix">🔧 REPAIR ${fmt(repairCost(t))} ⚡</button>`:''}</div>
     <div class="rowbtns"><button class="hbtn ${t.on?'':'gold'}" id="tp-pwr">${t.on?'🔋 POWER OFF — stake mode':'🔌 POWER ON — mine'}</button><button class="hbtn gold" id="tp-bench">🔧 OPEN CASE — INSTALL PARTS</button></div>
-    <div class="rowbtns"><button class="hbtn" id="tp-move">✋ MOVE / PLACE THIS TOWER</button></div>
+    <div class="rowbtns"><button class="hbtn" id="tp-move">✋ MOVE / PLACE ${S.towerSel>0?'THE SERVER RACK':'THIS TOWER'}</button></div>
     <div class="rowbtns"><button class="hbtn accent" id="tp-os">💻 LOG IN — TOWER OS</button><button class="hbtn gold" id="tp-shop">🛒 SHOP</button><button class="hbtn" id="tp-close">CLOSE</button></div>`;
   $('tp-shop').onclick=()=>{ openModal('m-shop'); renderShop(); };
   $('tp-pwr').onclick=()=>togglePower('tower');
   const fx=$('tp-fix'); if(fx) fx.onclick=()=>repairRig('tower');
   $('tp-bench').onclick=()=>openTowerBench();
-  $('tp-move').onclick=()=>{ if(typeof beginMoveTower==='function') beginMoveTower(); };
+  $('tp-move').onclick=()=>{ if(S.towerSel>0&&rackVis){ beginMove({kind:'rack'}); return; } if(typeof beginMoveTower==='function') beginMoveTower(); };
   $('tp-os').onclick=()=>openOS('tower');
   $('tp-close').onclick=()=>{ selTower=false; renderRigPanel(); };
 }
@@ -8176,6 +8196,7 @@ const MOVE_PLANE=new THREE.Plane(new THREE.Vector3(0,1,0),0);
 function moveTargets(){
   if(!moveSel) return [];
   if(moveSel.kind==='tower') return (typeof towerVis!=='undefined'&&towerVis)?[towerVis]:[];
+  if(moveSel.kind==='rack') return rackVis?[rackVis]:[];
   const rv=rigVis[moveSel.i]; if(!rv) return [];
   const t=[rv.group], r=S.rigs[moveSel.i];
   if(r&&r.slot<9&&deskAt[r.slot]) t.push(deskAt[r.slot]);   // garage: the desk travels with its case
@@ -8198,13 +8219,13 @@ function moveDragTo(e){
 }
 function beginMove(sel){
   if(moveSel) endMove(true);
-  const o=(sel.kind==='tower')?(typeof towerVis!=='undefined'?towerVis:null):(rigVis[sel.i]&&rigVis[sel.i].group);
+  const o=(sel.kind==='tower')?(typeof towerVis!=='undefined'?towerVis:null):(sel.kind==='rack')?rackVis:(rigVis[sel.i]&&rigVis[sel.i].group);
   if(!o) return;
   moveSel={kind:sel.kind,i:sel.i,x:o.position.x,y:o.position.y,z:o.position.z,rot:o.rotation.y,
            orig:{x:o.position.x,y:o.position.y,z:o.position.z,rot:o.rotation.y}};
   controls.enabled=false; selRig=-1; selTower=false; renderRigPanel&&renderRigPanel();
   const bar=document.getElementById('movebar'); if(bar) bar.style.display='flex';
-  const nm=document.getElementById('move-name'); if(nm) nm.textContent=sel.kind==='tower'?'Server Tower':('Rig '+((sel.i|0)+1));
+  const nm=document.getElementById('move-name'); if(nm) nm.textContent=sel.kind==='tower'?'Server Tower':sel.kind==='rack'?'Server Rack':('Rig '+((sel.i|0)+1));
   SFX&&SFX.click&&SFX.click();
   toast('✋ MOVE — drag to place, or use the bar (rotate · raise · snap). Hit ✓ DONE when it\'s where you want it. (Esc cancels)','cyan',7000);
 }
@@ -8224,7 +8245,8 @@ function endMove(persist){
   if(!moveSel) return;
   const m=moveSel;
   if(persist){
-    if(m.kind==='tower'){ S.towerPos={x:m.x,y:m.y,z:m.z}; S.towerRot=m.rot; syncRack(); }
+    if(m.kind==='tower'){ S.towerPos={x:m.x,y:m.y,z:m.z}; S.towerRot=m.rot; }
+    else if(m.kind==='rack'){ S.rackPos={x:m.x,y:m.y,z:m.z}; S.rackRot=m.rot; }
     else if(S.rigs[m.i]){ S.rigs[m.i].pos={x:m.x,y:m.y,z:m.z}; S.rigs[m.i].rot=m.rot; }
     save&&save();
   } else {
@@ -8239,6 +8261,7 @@ canvas.addEventListener('contextmenu',e=>{
   if(TRAILER) return;
   e.preventDefault();
   if(moveSel){ endMove(true); return; }
+  if(rackHitAt(e)>0){ beginMove({kind:'rack'}); return; }
   if(typeof towerVis!=='undefined'&&towerVis&&towerVis.visible){
     const r=canvas.getBoundingClientRect();
     mouse.x=((e.clientX-r.left)/r.width)*2-1; mouse.y=-((e.clientY-r.top)/r.height)*2+1;
