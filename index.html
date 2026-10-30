@@ -5938,6 +5938,13 @@ const COIN_CHAIN={pol:'Polygon',alt:'Altcoinchain',wtx:'WATTxchain',bitn:'Bitnet
 function rigMineCoin(r){ return (r&&r.algo!=null&&RIG_ALGO_COIN[r.algo])||CFG.nets[S.net].coin; }
 function rigPoolLabel(i){
   const r=S&&S.rigs&&S.rigs[i]; if(!r) return null;
+  if(typeof isLive==='function'&&isLive()){
+    const chain=(W3.chain&&W3.chain.name)||'Altcoinchain';
+    if(r.pc) return 'Gaming PC — no rig NFT, can\'t join a pool';
+    if(r.staked) return 'RIG #'+r.ocId+' — staked (WATT drip), not in a pool';
+    if(r.ocPool!=null) return 'Genesis pool #'+r.ocPool+' · '+(WEB3CFG.targets[r.ocTarget]?.sym||'?')+' : '+chain;
+    return 'RIG #'+r.ocId+' — idle · click 🏊 to pick a pool';
+  }
   const coin=rigMineCoin(r);
   let P=poolFor(coin,(S.pool&&S.pool[coin]));
   if(!P&&coin===CFG.nets[S.net].coin) P=curPool();
@@ -6219,13 +6226,23 @@ async function syncLiveRigsFromChain(force){
         for(let i=0;i<stkIds.length;i++) ids.push({id:Number(stkIds[i]), staked:true});
       }catch(e){}
     }
+    /* rigs MINING are escrowed in the engine — keep them in the room too,
+       tagged with the pool + coin they mine (the hover label shows it) */
+    try{
+      const eng=await poolCtr('engine');
+      const keys=await eng.sessionsOf(W3.addr);
+      for(const k of keys){ try{ const ss=await eng.sessions(k);
+        if(ss.active&&ss.owner.toLowerCase()===W3.addr.toLowerCase()&&ss.nftContract.toLowerCase()===c.pools.rigNft.toLowerCase())
+          ids.push({id:Number(ss.rigId), staked:false, pool:Number(ss.poolId), target:Number(ss.targetId)}); }catch(e){} }
+      stakedOk=true;
+    }catch(e){}
     const built=[];
     const nRig=Math.min(ids.length,slots.length);
     for(let i=0;i<nRig;i++){
       let hash=1200, algo=0;
       try{ const t=await rig.getRigTraits(ids[i].id); hash=Number(t.hashRate)||1200; algo=Number(t.algorithm); }catch(e){}
       const ngpu=Math.max(1,Math.min(8,Math.round(hash/400)));
-      built.push({ ocId:ids[i].id, algo, staked:ids[i].staked, slot:slots[i], cpu:3, gpus:Array(ngpu).fill(5), asic:0, frame:0, oc:{c:0,m:0}, crashT:0, on:1, wear:0 });
+      built.push({ ocId:ids[i].id, algo, staked:ids[i].staked, ocPool:ids[i].pool??null, ocTarget:ids[i].target??null, slot:slots[i], cpu:3, gpus:Array(ngpu).fill(5), asic:0, frame:0, oc:{c:0,m:0}, crashT:0, on:1, wear:0 });
     }
     /* Gaming PCs (component id 1) held in the wallet are DESKS too: one desk per
        PC, after the rig-NFT desks. They keep whatever parts you bolted in (saved
@@ -7081,6 +7098,31 @@ let _ocBusy=false;
    behind it (no POL validator), so nobody should be sent to mine there. Rigs
    already in a Polygon pool still show under MINING with STOP + CLAIM. */
 const POOL_HIDE={polygon:1};
+/* A pool is REAL only while its host's 100,000 WATT stake backs it — the same
+   rule the engine enforces (_hostStaked): registered, ACTIVE/PAUSED/UNSTAKING,
+   stake >= requiredStake. Pools failing it are left out of every join list. */
+const _hostOk={};
+async function ocHostBacked(c,owner){
+  const k=c.key+':'+String(owner).toLowerCase(), h=_hostOk[k];
+  if(h&&Date.now()-h.t<120000) return h.v;
+  let v;
+  try{ const E=await poolEthers();
+    const reg=new E.Contract(c.pools.registry,POOL_ABI.registry,new E.JsonRpcProvider(c.rpc,c.chainId,{staticNetwork:true}));
+    if(!(await reg.isRegistered(owner))) v=false;
+    else { const [p,req]=await Promise.all([reg.getPool(owner),reg.requiredStake()]);
+      v=[1,2,3].includes(Number(p.status))&&p.stakedAmount>=req; }
+  }catch(e){ v=h?h.v:true; }          // RPC hiccup: keep the last answer
+  _hostOk[k]={v,t:Date.now()}; return v;
+}
+/* a rig may join a pool that takes any algorithm, or its own */
+const ocAlgoOk=(p,algo)=>Number(p.requiredAlgo)===255||Number(p.requiredAlgo)===Number(algo);
+/* the pools a miner can actually join on chain c: active + host-backed */
+async function ocRealPools(c,eng){
+  const n=Number(await eng.poolCount());
+  const ps=await Promise.all(Array.from({length:n},(_,i)=>eng.getPool(i)));
+  const ok=await Promise.all(ps.map(p=>p.active?ocHostBacked(c,p.owner):false));
+  return ps.map((p,i)=>({p,i,ok:ok[i]}));
+}
 async function ocPublicPoolsHtml(skipKey){
   const E=await poolEthers();
   const keys=Object.keys(WEB3CFG.chains).filter(k=>WEB3CFG.chains[k]&&WEB3CFG.chains[k].pools&&WEB3CFG.chains[k].pools.engine&&k!==skipKey&&!POOL_HIDE[k]);
@@ -7088,9 +7130,8 @@ async function ocPublicPoolsHtml(skipKey){
     const c=WEB3CFG.chains[k];
     try{
       const eng=new E.Contract(c.pools.engine,POOL_ABI.engine,new E.JsonRpcProvider(c.rpc,c.chainId,{staticNetwork:true}));
-      const n=Number(await eng.poolCount());
-      const ps=await Promise.all(Array.from({length:n},(_,i)=>eng.getPool(i)));
-      const rows=ps.map((p,i)=>!p.active?'':`<div class="prow" data-pickpool="${k}:${i}:${Number(p.requiredAlgo)}" style="cursor:pointer" title="Mine in this pool"><div class="pi"><b>🟢 #${i} ${p.name}</b>
+      const ps=await ocRealPools(c,eng);
+      const rows=ps.map(({p,i,ok})=>!ok?'':`<div class="prow" data-pickpool="${k}:${i}:${Number(p.requiredAlgo)}" style="cursor:pointer" title="Mine in this pool"><div class="pi"><b>🟢 #${i} ${p.name}</b>
         <small>coins: <b>${(p.targetIds||[]).map(t=>WEB3CFG.targets[Number(t)]?.sym||'?').join(' · ')}</b> · ${Number(p.requiredAlgo)===255?'any rig':'algo '+Number(p.requiredAlgo)+' rigs'} · host ${w3Short(p.owner)} · ${Number(p.minersActive)} rig${Number(p.minersActive)===1?'':'s'} mining</small></div>
         <div class="pf">${(Number(p.rewardFeeBps)/100).toFixed(1)}%<small>fee</small></div><button class="hbtn accent">MINE HERE ›</button></div>`).join('');
       return `<div class="valbox" style="border-color:#3dff8a44"><b>⛏ MINING POOLS — ${c.name}</b>
@@ -7176,9 +7217,10 @@ async function fillChainPools(){
     /* engine pools — THE mineable pool list (shown to everyone; registry
        getActivePools hides hosts whose node never heartbeats, which is every
        NFT-mining pool, so genesis pools were invisible before this list) */
-    const engPools=[];
-    if(!POOL_HIDE[c.key]) for(let i=0;i<Number(engN);i++) engPools.push(await eng.getPool(i));
+    const engPools=[], engOk=[];
+    if(!POOL_HIDE[c.key]) for(const x of await ocRealPools(c,eng)){ engPools.push(x.p); engOk.push(x.ok); }
     const enginePoolRows=engPools.map((p,i)=>{
+      if(!engOk[i]) return '';
       const menu=(p.targetIds||[]).map(t=>WEB3CFG.targets[Number(t)]?.sym||'?').join(' · ');
       const mine=p.owner.toLowerCase()===W3.addr.toLowerCase();
       return `<div class="prow${mine?' sel':''}"><div class="pi"><b>${p.active?'🟢':'🔴'} #${i} ${p.name}</b>
@@ -7190,7 +7232,7 @@ async function fillChainPools(){
     for(let i=0;i<Number(rigN);i++){
       const id=await rig.tokenOfOwnerByIndex(W3.addr,i);
       const t=await rig.getRigTraits(id);
-      const opts=engPools.map((p,pi)=>p.active?`<option value="${pi}">#${pi} ${p.name} → ${(p.targetIds||[]).map(t=>WEB3CFG.targets[Number(t)]?.sym||'?').join('+')} (fee ${(Number(p.rewardFeeBps)/100).toFixed(1)}%)</option>`:'').join('');
+      const opts=engPools.map((p,pi)=>(engOk[pi]&&ocAlgoOk(p,t.algorithm))?`<option value="${pi}">#${pi} ${p.name} → ${(p.targetIds||[]).map(t=>WEB3CFG.targets[Number(t)]?.sym||'?').join('+')} (fee ${(Number(p.rewardFeeBps)/100).toFixed(1)}%)</option>`:'').join('');
       const stakeBtn = c.pools.stakingPool?`<button class="hbtn gold" data-ocstake="${id}" title="Power off + stake on-chain: earn 100% stake weight from the WATT drip">🥩 STAKE</button>`:'';
       rigRows+=`<div class="prow"><div class="pi"><b>⛏ RIG #${id}</b><small>${t.hashRate} H · eff ${t.efficiency} · ${t.wattConsumption} ⚡/h · algo ${t.algorithm}</small></div>
         ${opts?`<select id="oc-pool-${id}" class="hbtn" data-algo="${t.algorithm}">${opts}</select><button class="hbtn accent" data-ocmine="${id}">MINE</button>`:''}${stakeBtn}${!opts&&!stakeBtn?'<small style="color:var(--dim)">no active pools</small>':''}</div>`;
@@ -7421,6 +7463,23 @@ $('b-pool').onclick=openPoolHub;
 /* HUD pool pill: click = pick the pool to mine right there (demo pools for the
    current chain + your own node), no need to open the full Pool Hub. */
 $('coin-pool').onclick=async()=>{
+  if(isLive()){
+    /* LIVE: only pools that really exist on-chain (host has 100k WATT staked) */
+    toast('Reading the real pools…','cyan',2500);
+    const k='alt', c=WEB3CFG.chains[k]; let opts=[];
+    try{ const E=await poolEthers();
+      const eng=new E.Contract(c.pools.engine,POOL_ABI.engine,new E.JsonRpcProvider(c.rpc,c.chainId,{staticNetwork:true}));
+      for(const {p,i,ok} of await ocRealPools(c,eng)){ if(!ok) continue;
+        const coins=(p.targetIds||[]).map(t=>WEB3CFG.targets[Number(t)]?.sym||'?').join(' · ');
+        opts.push({value:`${k}:${i}:${Number(p.requiredAlgo)}`,cls:'accent',
+          label:`⛏ #${i} ${p.name} <small style="opacity:.65">${coins} · ${Number(p.requiredAlgo)===255?'any rig':'algo '+Number(p.requiredAlgo)+' rigs only'} · fee ${(Number(p.rewardFeeBps)/100).toFixed(1)}% · ${Number(p.minersActive)} mining</small>`}); }
+    }catch(e){ toast('Could not read the pools: '+(''+(e&&e.message||e)).slice(0,60),'red'); return; }
+    if(!opts.length) opts.push({value:null,disabled:true,label:'No pool on Altcoinchain has a staked host right now'});
+    opts.push({value:'__hub',cls:'',label:'🏊 OPEN POOL HUB — your rigs, MINE / STOP / CLAIM'});
+    const pick=await ocChoose('🏊 REAL MINING POOLS — Altcoinchain',opts);
+    if(pick==null) return; if(pick==='__hub') return openPoolHub();
+    const [kk,ii,aa]=pick.split(':'); openPoolHub(); return ocPickPool(kk,+ii,+aa);
+  }
   const coin=CFG.nets[S.net].coin, cur=S.pool[coin];
   const opts=POOLS[coin].map(pl=>({value:pl.id,cls:pl.id===cur?'gold':'accent',
     label:`${pl.official?'⭐ ':''}${pl.name} <small style="opacity:.65">fee ${(pl.fee*100).toFixed(1)}% · payout x${pl.speed}</small>${pl.id===cur?' · <b>CONNECTED</b>':''}`}));
@@ -8166,8 +8225,8 @@ function osAppMiner(body){
       try{
         const k='alt', c=WEB3CFG.chains[k], E=await poolEthers();
         const eng=new E.Contract(c.pools.engine,POOL_ABI.engine,new E.JsonRpcProvider(c.rpc,c.chainId,{staticNetwork:true}));
-        const n=Number(await eng.poolCount()); const btns=[];
-        for(let i=0;i<n;i++){ const p=await eng.getPool(i); if(!p.active) continue;
+        const btns=[];
+        for(const {p,i,ok} of await ocRealPools(c,eng)){ if(!ok) continue;
           const coins=(p.targetIds||[]).map(t=>WEB3CFG.targets[Number(t)]?.sym||'?').join('+');
           btns.push(`<button class="os-task" data-pickpool="${k}:${i}:${Number(p.requiredAlgo)}" title="${p.name}">⛏ ${coins} <small>#${i}${p.owner.toLowerCase()===(W3.addr||'').toLowerCase()?' · free':''}</small></button>`); }
         box.innerHTML=(btns.join('')||'<span style="font-size:10px;color:#ffae42">no Altcoinchain pools yet</span>')
@@ -8181,9 +8240,9 @@ function osAppMiner(body){
     (async()=>{
       const c=poolCfg();
       try{
-        const eng=await poolCtr('engine'); const n=Number(await eng.poolCount()); const btns=[];
-        for(let i=0;i<n;i++){ const p=await eng.getPool(i);
-          if(!p.active||!(Number(p.requiredAlgo)===255||Number(p.requiredAlgo)===rg0.algo)) continue;
+        const eng=await poolCtr('engine'); const btns=[];
+        for(const {p,i,ok} of await ocRealPools(c,eng)){
+          if(!ok||!ocAlgoOk(p,rg0.algo)) continue;
           const coins=(p.targetIds||[]).map(t=>WEB3CFG.targets[Number(t)]?.sym||'?').join('+');
           btns.push(`<button class="os-task" data-ocpool="${i}" title="${p.name}">⛏ ${coins} <small>#${i}${p.owner.toLowerCase()===(W3.addr||'').toLowerCase()?' · free':''}</small></button>`); }
         box.innerHTML=btns.join('')||`<span style="font-size:10px;color:#ffae42">no ${c.name} pool accepts algo ${rg0.algo} rigs</span>`;
