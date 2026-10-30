@@ -6717,14 +6717,40 @@ async function ocFillPayoutBalances(addrs){
 }
 /* async fill of the #chainpools box inside the Pool Hub */
 let _ocBusy=false;
+/* Every engine pool on every chain with V3 pool contracts (Polygon + Altcoinchain),
+   read through public RPCs — no wallet needed. The per-wallet section below only
+   covers the chain the wallet is on, so without this list a visitor with no wallet,
+   or a wallet on another chain, saw no pools at all. skipKey = the chain already
+   shown in the per-wallet section. */
+async function ocPublicPoolsHtml(skipKey){
+  const E=await poolEthers();
+  const keys=Object.keys(WEB3CFG.chains).filter(k=>WEB3CFG.chains[k]&&WEB3CFG.chains[k].pools&&WEB3CFG.chains[k].pools.engine&&k!==skipKey);
+  const blocks=await Promise.all(keys.map(async k=>{
+    const c=WEB3CFG.chains[k];
+    try{
+      const eng=new E.Contract(c.pools.engine,POOL_ABI.engine,new E.JsonRpcProvider(c.rpc,c.chainId,{staticNetwork:true}));
+      const n=Number(await eng.poolCount());
+      const ps=await Promise.all(Array.from({length:n},(_,i)=>eng.getPool(i)));
+      const rows=ps.map((p,i)=>!p.active?'':`<div class="prow"><div class="pi"><b>🟢 #${i} ${p.name}</b>
+        <small>coins: <b>${(p.targetIds||[]).map(t=>WEB3CFG.targets[Number(t)]?.sym||'?').join(' · ')}</b> · ${Number(p.requiredAlgo)===255?'any rig':'algo '+Number(p.requiredAlgo)+' rigs'} · host ${w3Short(p.owner)} · ${Number(p.minersActive)} rig${Number(p.minersActive)===1?'':'s'} mining</small></div>
+        <div class="pf">${(Number(p.rewardFeeBps)/100).toFixed(1)}%<small>fee</small></div></div>`).join('');
+      return `<div class="valbox" style="border-color:#3dff8a44"><b>⛏ MINING POOLS — ${c.name}</b>
+        <small>${W3.addr&&W3.chain&&W3.chain.key===k?'':'Switch your wallet to <b>'+c.name+'</b> to MINE in these pools with your rigs.'}</small>
+        ${rows||`<small style="color:var(--dim)">No pools on ${c.name} yet.</small>`}</div>`;
+    }catch(e){ return `<div class="valbox" style="border-color:#ff5b5b44"><b>⛏ MINING POOLS — ${c.name}</b><small>could not read pools: ${(''+(e&&e.message||e)).slice(0,90)}</small></div>`; }
+  }));
+  return blocks.join('');
+}
 async function fillChainPools(){
   ocRenderWallet(); // live balances strip, independent of the pools contracts
   const el=$('chainpools'); if(!el) return;
   if(!W3.addr){ el.innerHTML=`<div class="valbox" style="border-color:#ffb14544"><b>⛓ REAL ON-CHAIN POOLS</b>
-    <small>Connect a wallet (🦊 WALLET) to host a real pool: <b>100,000 WATT v2</b> locked in the PoolRegistry host contract. ONE pool offers a MENU of coins (ALT / WTX / BSV / HTH / BITN / THA …) — every miner picks which coin each rig mines.</small></div>`; return; }
+    <small>Connect a wallet (🦊 WALLET) to host a real pool: <b>100,000 WATT v2</b> locked in the PoolRegistry host contract. ONE pool offers a MENU of coins (ALT / WTX / BSV / HTH / BITN / THA …) — every miner picks which coin each rig mines.</small></div>`;
+    ocPublicPoolsHtml(null).then(h=>{ if(!W3.addr&&$('chainpools')) $('chainpools').insertAdjacentHTML('afterbegin',h); }).catch(()=>{}); return; }
   const c=poolCfg();
   if(!c){ el.innerHTML=`<div class="valbox" style="border-color:#ffb14544"><b>⛓ REAL ON-CHAIN POOLS</b>
-    <small>${W3.chain?W3.chain.name+' V3 pool contracts are pending deploy — switch the wallet to <b>Polygon</b> or <b>Altcoinchain</b> to host or mine now.':'Switch the wallet to Polygon or Altcoinchain.'}</small></div>`; return; }
+    <small>${W3.chain?W3.chain.name+' V3 pool contracts are pending deploy — switch the wallet to <b>Polygon</b> or <b>Altcoinchain</b> to host or mine now.':'Switch the wallet to Polygon or Altcoinchain.'}</small></div>`;
+    ocPublicPoolsHtml(null).then(h=>{ if(!poolCfg()&&$('chainpools')) $('chainpools').insertAdjacentHTML('afterbegin',h); }).catch(()=>{}); return; }
   if(_ocBusy) return; _ocBusy=true;
   el.innerHTML=`<div class="valbox" style="border-color:#ffb14544"><b>⛓ REAL ON-CHAIN POOLS — ${c.name}</b><small>reading chain…</small></div>`;
   try{
@@ -6898,6 +6924,7 @@ async function fillChainPools(){
   }catch(e){
     el.innerHTML=`<div class="valbox" style="border-color:#ff5b5b44"><b>⛓ REAL ON-CHAIN POOLS</b><small>chain read failed: ${(''+(e&&e.message||e)).slice(0,110)}</small></div>`;
   }
+  if(W3.addr&&c) ocPublicPoolsHtml(c.key).then(h=>{ const x=$('chainpools'); if(x&&W3.chain&&W3.chain.key===c.key) x.insertAdjacentHTML('beforeend',h); }).catch(()=>{});
   _ocBusy=false;
 }
 
