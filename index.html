@@ -3161,6 +3161,38 @@ function towerNorm(){
   return S.towerRigs;
 }
 function towerAll(){ return (S&&S.tower)?towerNorm().slice(0,S.tower|0):[]; }
+/* Which rack bay each tower sits in: S.towerBays[i] = 0..19, or -1 = standing
+   on the floor (the free-standing case; at most one). Default: tower #1
+   stands, the rest fill bays in order. Players re-arrange with the bay grid in
+   the tower panel or by dropping the standing tower onto a rack shelf. */
+function towerBaysNorm(){
+  const n=S&&S.tower|0, nb=RACK.cols*RACK.rows;
+  if(!Array.isArray(S.towerBays)) S.towerBays=[];
+  const b=S.towerBays; b.length=Math.min(b.length,n);
+  const used=new Set(); let stand=false;
+  for(let i=0;i<b.length;i++){
+    let v=b[i]; if(v==null||isNaN(v)) { b[i]=undefined; continue; }
+    v=v|0;
+    if(v<0){ if(stand) b[i]=undefined; else { stand=true; b[i]=-1; } continue; }
+    if(v>=nb||used.has(v)) b[i]=undefined; else used.add(v);
+  }
+  for(let i=0;i<n;i++){ if(b[i]!==undefined) continue;
+    if(i===0&&!stand){ b[i]=-1; stand=true; continue; }
+    let f=0; while(used.has(f)&&f<nb) f++; b[i]=f<nb?f:-1; used.add(f); }
+  return b;
+}
+function towerStandIdx(){ if(!S||!S.tower) return -1; return towerBaysNorm().indexOf(-1); }
+function towerAtBay(bay){ return S&&S.tower?towerBaysNorm().indexOf(bay):-1; }
+/* put tower i in bay (or -1 = floor); whoever is there swaps into i's old place */
+function towerSetBay(i,bay){
+  const b=towerBaysNorm(); if(i<0||i>=b.length) return;
+  const j=b.indexOf(bay); const old=b[i];
+  if(j>=0&&j!==i) b[j]=old;
+  b[i]=bay;
+  if(typeof syncRack==='function') syncRack();
+  if(typeof syncTowerBuild==='function') syncTowerBuild();
+  save&&save();
+}
 function towerSelect(i){ towerNorm(); S.towerSel=Math.min(Math.max(0,i|0),Math.max(1,S.tower|0)-1); S.towerRig=S.towerRigs[S.towerSel]; }
 function towerRigOn(t){ if(t===undefined) t=S.towerRig; return !!(S.tower&&t&&t.on!==0); }
 /* same overclock + wear/crash formula as rigHash/rigWatt — the tower has its
@@ -3978,7 +4010,7 @@ function makeProcTower(){
 function setTowerOwned(own){
   /* re-shown after a world switch or a reset: the tower is the same object but
      its build belongs to the new save, so resync what is inside it */
-  if(towerVis){ towerVis.visible=own; syncTowerBuild(); syncRack(); return; }
+  if(towerVis){ towerVis.visible=own; syncRack(); syncTowerBuild(); return; }
   if(!own) return;
   towerVis=new THREE.Group();
   if(PROTO.tower){
@@ -4004,8 +4036,8 @@ function setTowerOwned(own){
   else towerVis.position.set(6.6,0,-ROOM.D/2+0.9);
   towerVis.rotation.y=(S&&S.towerRot!=null)?S.towerRot:0.35;
   scene.add(towerVis);
-  syncTowerGlow();
   syncRack();
+  syncTowerGlow();
 }
 /* ---------- SERVER RACK: towers 2+ ----------
    Tower #1 stands on its own; every extra tower goes into a full-size server
@@ -4033,28 +4065,31 @@ function makeRackFrame(){
 }
 function syncRack(){
   if(typeof scene==='undefined') return;
-  const bays=Math.max(0,Math.min(RACK.cols*RACK.rows,(S&&S.tower|0)-1));
   if(rackVis){ scene.remove(rackVis); rackVis=null; }
-  if(!bays||!towerVis||!towerVis.visible) return;
+  if(!towerVis) return;
+  const own=!!(S&&S.tower);
+  const bays=own?towerBaysNorm():[];
+  towerVis.visible = own && bays.indexOf(-1)>=0;          // the floor case = the standing tower
+  const racked=bays.map((b,i)=>[i,b]).filter(([,b])=>b>=0);
+  if(!racked.length) return;
   rackVis=makeRackFrame();
   const W=rackVis.userData.W, mdl=towerVis.children[0], shells=towerVis.userData.shell||[];
-  // own materials, reset to the CLOSED case (tower #1's shell may be smoked glass)
-  const own=m=>{ const n=m.clone(); const sh=shells.find(x=>x.mat===m); if(sh){ n.transparent=sh.t; n.opacity=sh.o; n.depthWrite=sh.w; } return n; };
-  for(let i=0;i<bays;i++){
-    const col=i%RACK.cols, row=Math.floor(i/RACK.cols);
+  // own materials, reset to the CLOSED case (the standing case may be smoked glass)
+  const own2=m=>{ const n=m.clone(); const sh=shells.find(x=>x.mat===m); if(sh){ n.transparent=sh.t; n.opacity=sh.o; n.depthWrite=sh.w; } return n; };
+  for(const [ti,b] of racked){
+    const col=b%RACK.cols, row=Math.floor(b/RACK.cols);
     const bay=new THREE.Group();
     bay.position.set(-W/2+RACK.bw*(col+0.5), RACK.base+0.04+row*RACK.bh, 0);
     if(mdl){ const c=mdl.clone(true);
-      c.traverse(o=>{ if(o.material) o.material=Array.isArray(o.material)?o.material.map(own):own(o.material); o.renderOrder=0; });
-      bay.add(c); }                                  // full size — same scale as tower #1
+      c.traverse(o=>{ if(o.material) o.material=Array.isArray(o.material)?o.material.map(own2):own2(o.material); o.renderOrder=0; });
+      bay.add(c); }                                  // full size — same scale as the standing case
     const led=new THREE.Mesh(new THREE.BoxGeometry(0.6,0.05,0.03),new THREE.MeshBasicMaterial({color:0x3dff8a}));
-    led.position.set(0,0.1,RACK.bd/2+0.04); bay.add(led); bay.userData.led=led;
+    led.position.set(0,0.1,RACK.bd/2+0.04); bay.add(led); bay.userData.led=led; bay.userData.tower=ti;
     const hit=new THREE.Mesh(new THREE.BoxGeometry(RACK.bw-0.1,RACK.bh-0.1,RACK.bd),new THREE.MeshBasicMaterial({visible:false,depthWrite:false}));
-    hit.position.y=RACK.bh/2; hit.userData.rackBay=i+1; bay.add(hit);
+    hit.position.y=RACK.bh/2; hit.userData.rackTower=ti; bay.add(hit);
     rackVis.add(bay);
   }
-  // default: against the right wall, facing into the room — unless the player
-  // has moved it (S.rackPos / S.rackRot from the move editor)
+  // default: against the right wall, facing into the room — unless moved
   if(S&&S.rackPos) rackVis.position.set(S.rackPos.x, S.rackPos.y||0, S.rackPos.z);
   else rackVis.position.set(ROOM.W/2-RACK.bd/2-0.15, 0, 0);
   rackVis.rotation.y=(S&&S.rackRot!=null)?S.rackRot:-Math.PI/2;
@@ -4065,21 +4100,32 @@ function syncRack(){
 function syncRackLeds(){
   if(!rackVis) return; const ts=towerAll();
   rackVis.children.forEach(b=>{ const led=b.userData&&b.userData.led; if(!led) return;
-    const bi=b.children.find(x=>x.userData&&x.userData.rackBay)?.userData.rackBay; const t=ts[bi]; if(!t) return;
+    const t=ts[b.userData.tower]; if(!t) return;
     led.material.color.setHex(t.crashT>0||t.wear>=100?0xff5b5b:t.on?0x3dff8a:0xffb020); });
+}
+/* where a dragged standing tower lands on the rack: nearest bay to the drop
+   point (column from the position along the rack, tier from the lift height).
+   An occupied bay is fine — the two towers swap. -1 = not over the rack. */
+function rackDropBay(m){
+  if(!rackVis) return -1;
+  const p=rackVis.worldToLocal(new THREE.Vector3(m.x,0,m.z)), W=rackVis.userData.W;
+  if(Math.abs(p.z)>RACK.bd/2+1.0||p.x<-W/2-0.5||p.x>W/2+0.5) return -1;
+  const col=Math.max(0,Math.min(RACK.cols-1,Math.floor((p.x+W/2)/RACK.bw)));
+  const row=Math.max(0,Math.min(RACK.rows-1,Math.round((m.y-RACK.base)/RACK.bh)));
+  return row*RACK.cols+col;
 }
 function rackHitAt(e){
   if(!rackVis) return -1;
   const r=canvas.getBoundingClientRect();
   mouse.x=((e.clientX-r.left)/r.width)*2-1; mouse.y=-((e.clientY-r.top)/r.height)*2+1;
   ray.setFromCamera(mouse,cam);
-  for(const h of ray.intersectObject(rackVis,true)){ let o=h.object; while(o){ if(o.userData&&o.userData.rackBay) return o.userData.rackBay; o=o.parent; } }
+  for(const h of ray.intersectObject(rackVis,true)){ let o=h.object; while(o){ if(o.userData&&o.userData.rackTower!=null) return o.userData.rackTower; o=o.parent; } }
   return -1;
 }
 /* brighten the tower's glow with how much hardware is installed in it */
 function syncTowerGlow(){
   if(typeof towerVis==='undefined'||!towerVis||!towerVis.userData.glow) return;
-  const load=(typeof towerHash==='function'&&S)?towerHash(towerNorm()[0]):0;
+  const load=(typeof towerHash==='function'&&S&&towerStandIdx()>=0)?towerHash(towerNorm()[towerStandIdx()]):0;
   towerVis.userData.glow.intensity=26+Math.min(50,load*0.15);
   syncTowerBuild(); syncRackLeds();
 }
@@ -4223,7 +4269,7 @@ function placeTowerCpus(parent, ids, bay, board, size){
 }
 function syncTowerBuild(){
   if(typeof towerVis==='undefined'||!towerVis) return;
-  const t=(typeof S!=='undefined'&&S)?towerNorm()[0]:null;
+  const t=(typeof S!=='undefined'&&S&&towerStandIdx()>=0)?towerNorm()[towerStandIdx()]:null;
   const gpus=(t&&t.gpus)||[], cpus=(t&&t.cpus)||[];
   const filled=gpus.length+cpus.length;
   if(towerVis.userData.build){ towerVis.remove(towerVis.userData.build); towerVis.userData.build=null; }
@@ -7429,6 +7475,20 @@ function renderRigPanel(){
    This used to be the whole story for clicking the tower — it jumped straight
    to the bench with no way to see stats, power it down, pick a network, or
    log into its OS, unlike every Gaming PC rig. */
+/* 5×4 picker mirroring the rack (top tier first). Click a bay to move the
+   selected tower there — an occupied bay swaps the two towers. */
+function towerBayGridHtml(){
+  const b=towerBaysNorm(), me=b[S.towerSel]; let cells='';
+  for(let row=RACK.rows-1;row>=0;row--) for(let col=0;col<RACK.cols;col++){
+    const bay=row*RACK.cols+col, who=b.indexOf(bay), mine=who===S.towerSel;
+    cells+=`<button class="hbtn" data-tbay="${bay}" title="tier ${row+1}, bay ${col+1}${who>=0?' — tower #'+(who+1):' — empty'}"
+      style="padding:4px 0;min-width:0;font-size:11px;${mine?'background:rgba(61,255,138,.25);border-color:#3dff8a;color:var(--grn)':who>=0?'color:var(--cyan)':'color:var(--dim)'}">${who>=0?'#'+(who+1):'·'}</button>`;
+  }
+  const st=b.indexOf(-1);
+  return `<div style="margin:6px 0"><small style="color:var(--dim)">RACK — click a bay to put this tower there (top tier first)</small>
+    <div style="display:grid;grid-template-columns:repeat(${RACK.cols},1fr);gap:3px;margin-top:4px">${cells}</div>
+    <div class="rowbtns" style="margin-top:4px"><button class="hbtn${me<0?' gold':''}" data-tbay="-1">${me<0?'✓ STANDING ON THE FLOOR':st>=0?'⇄ SWAP WITH THE FLOOR TOWER (#'+(st+1)+')':'⬇ STAND ON THE FLOOR'}</button></div></div>`;
+}
 function renderTowerPanel(){
   const p=$('rigp');
   if(!selTower||!S.tower||!S.towerRig){ p.classList.remove('open'); return; }
@@ -7438,7 +7498,7 @@ function renderTowerPanel(){
   const eff=Math.round(hf*pf*100);
   const ocOn=t.oc&&(t.oc.c+t.oc.m)>0, crashed=t.crashT>0, broken=t.wear>=100;
   const wearCol=t.wear>=100?'var(--red)':t.wear>=60?'#ffae42':t.wear>=30?'var(--gold)':'var(--grn)';
-  p.innerHTML=`<h2>🗄 Server Tower${(S.tower|0)>1?' #'+(S.towerSel+1)+' of '+S.tower+(S.towerSel?' <small style="color:var(--dim);font-size:11px">· rack bay '+S.towerSel+'</small>':''):''} ${broken?'<span style="color:var(--red);font-size:12px">🔥 BROKEN</span>':crashed?'<span style="color:var(--red);font-size:12px">💥 CRASHED</span>':!t.on?'<span style="color:var(--gold);font-size:12px">🔋 STAKING</span>':ocOn?'<span style="color:var(--cyan);font-size:12px">🎛 OC +'+Math.round((ocHashMult(t)-1)*100)+'%</span>':''}</h2>
+  p.innerHTML=`<h2>🗄 Server Tower${(S.tower|0)>1?' #'+(S.towerSel+1)+' of '+S.tower+(towerBaysNorm()[S.towerSel]>=0?' <small style="color:var(--dim);font-size:11px">· tier '+(Math.floor(towerBaysNorm()[S.towerSel]/RACK.cols)+1)+', bay '+(towerBaysNorm()[S.towerSel]%RACK.cols+1)+'</small>':''):''} ${broken?'<span style="color:var(--red);font-size:12px">🔥 BROKEN</span>':crashed?'<span style="color:var(--red);font-size:12px">💥 CRASHED</span>':!t.on?'<span style="color:var(--gold);font-size:12px">🔋 STAKING</span>':ocOn?'<span style="color:var(--cyan);font-size:12px">🎛 OC +'+Math.round((ocHashMult(t)-1)*100)+'%</span>':''}</h2>
     <div class="sub">Dual-CPU server board · ${t.cpus.length}/2 CPUs · ${t.gpus.length}/6 GPUs</div>
     <div class="stats2">
       <div class="st2"><small>HASHPOWER</small><b style="color:var(--cyan)">${Math.round(towerHash())}</b></div>
@@ -7449,13 +7509,18 @@ function renderTowerPanel(){
     <div class="wearrow"><small>WEAR</small><div class="wearbar"><i style="width:${t.wear.toFixed(1)}%;background:${wearCol}"></i></div><b style="color:${wearCol}">${t.wear.toFixed(0)}%</b>
       ${t.wear>=1?`<button class="hbtn" id="tp-fix">🔧 REPAIR ${fmt(repairCost(t))} ⚡</button>`:''}</div>
     <div class="rowbtns"><button class="hbtn ${t.on?'':'gold'}" id="tp-pwr">${t.on?'🔋 POWER OFF — stake mode':'🔌 POWER ON — mine'}</button><button class="hbtn gold" id="tp-bench">🔧 OPEN CASE — INSTALL PARTS</button></div>
-    <div class="rowbtns"><button class="hbtn" id="tp-move">✋ MOVE / PLACE ${S.towerSel>0?'THE SERVER RACK':'THIS TOWER'}</button></div>
+    ${(S.tower|0)>1||towerBaysNorm()[S.towerSel]>=0?towerBayGridHtml():''}
+    <div class="rowbtns"><button class="hbtn" id="tp-move">✋ MOVE / PLACE ${towerBaysNorm()[S.towerSel]>=0?'THE SERVER RACK':'THIS TOWER'}</button></div>
     <div class="rowbtns"><button class="hbtn accent" id="tp-os">💻 LOG IN — TOWER OS</button><button class="hbtn gold" id="tp-shop">🛒 SHOP</button><button class="hbtn" id="tp-close">CLOSE</button></div>`;
   $('tp-shop').onclick=()=>{ openModal('m-shop'); renderShop(); };
   $('tp-pwr').onclick=()=>togglePower('tower');
   const fx=$('tp-fix'); if(fx) fx.onclick=()=>repairRig('tower');
   $('tp-bench').onclick=()=>openTowerBench();
-  $('tp-move').onclick=()=>{ if(S.towerSel>0&&rackVis){ beginMove({kind:'rack'}); return; } if(typeof beginMoveTower==='function') beginMoveTower(); };
+  document.querySelectorAll('#rigp [data-tbay]').forEach(b=>b.onclick=()=>{ const bay=+b.dataset.tbay;
+    towerSetBay(S.towerSel,bay); SFX.click();
+    toast(bay<0?`🗄 Server Tower #${S.towerSel+1} now stands on the floor`:`🗄 Server Tower #${S.towerSel+1} → tier ${Math.floor(bay/RACK.cols)+1}, bay ${bay%RACK.cols+1}`,'grn',5000);
+    renderTowerPanel(); });
+  $('tp-move').onclick=()=>{ if(towerBaysNorm()[S.towerSel]>=0&&rackVis){ beginMove({kind:'rack'}); return; } if(typeof beginMoveTower==='function') beginMoveTower(); };
   $('tp-os').onclick=()=>openOS('tower');
   $('tp-close').onclick=()=>{ selTower=false; renderRigPanel(); };
 }
@@ -8189,7 +8254,7 @@ canvas.addEventListener('pointermove',e=>{
   const h=pick(e);
   const hr=(typeof h==='number')?h:-1;
   if(hr!==hoverRig){ hoverRig=hr; if(typeof updatePoolPill==='function') updatePoolPill(); }
-  canvas.style.cursor=(hr>=0||(h&&h.chair!==undefined)||(hr<0&&(towerHitAt(e)||rackHitAt(e)>0)))?'pointer':'default';
+  canvas.style.cursor=(hr>=0||(h&&h.chair!==undefined)||(hr<0&&(towerHitAt(e)||rackHitAt(e)>=0)))?'pointer':'default';
 });
 canvas.addEventListener('pointerdown',e=>{ if(moveSel){ if(e.buttons&1) moveDragTo(e); return; } pdown=[e.clientX,e.clientY]; });
 canvas.addEventListener('pointerup',e=>{
@@ -8199,8 +8264,8 @@ canvas.addEventListener('pointerup',e=>{
   if(dx*dx+dy*dy>36) return;
   /* click the Server Tower → its panel (stats/power/OS/move/shop), same first
      stop a Gaming PC gets — INSTALL PARTS is one button away, not automatic */
-  { const rb=rackHitAt(e); if(rb>0){ towerSelect(rb); selRig=-1; selTower=true; SFX.click(); renderRigPanel(); return; } }
-  if(towerHitAt(e)){ towerSelect(0); selRig=-1; selTower=true; SFX.click(); renderRigPanel(); return; }
+  { const rb=rackHitAt(e); if(rb>=0){ towerSelect(rb); selRig=-1; selTower=true; SFX.click(); renderRigPanel(); return; } }
+  if(towerHitAt(e)){ towerSelect(Math.max(0,towerStandIdx())); selRig=-1; selTower=true; SFX.click(); renderRigPanel(); return; }
   const h=pick(e);
   if(h&&h.chair!==undefined){ sitDown(h.chair); return; }
   if(SIT.on){ standUp(); return; }
@@ -8227,7 +8292,7 @@ function moveApply(){
   const m=moveSel; if(!m) return;
   m.x=Math.max(-ROOM.W/2+0.6,Math.min(ROOM.W/2-0.6,m.x));
   m.z=Math.max(-ROOM.D/2+0.6,Math.min(30,m.z));       // 30 reaches the containers/warehouse
-  m.y=Math.max(0,Math.min(4.2,m.y));
+  m.y=Math.max(0,Math.min(m.kind==='tower'?RACK.base+(RACK.rows-1)*RACK.bh+0.1:4.2,m.y));
   for(const o of moveTargets()){ o.position.set(m.x,m.y,m.z); o.rotation.y=m.rot; }
 }
 function moveDragTo(e){
@@ -8266,7 +8331,16 @@ function endMove(persist){
   if(!moveSel) return;
   const m=moveSel;
   if(persist){
-    if(m.kind==='tower'){ S.towerPos={x:m.x,y:m.y,z:m.z}; S.towerRot=m.rot; }
+    if(m.kind==='tower'){
+      const bay=rackDropBay(m);
+      if(bay>=0){ const ti=towerStandIdx();
+        for(const o of moveTargets()){ o.position.set(m.orig.x,m.orig.y,m.orig.z); o.rotation.y=m.orig.rot; }
+        if(ti>=0){ towerSetBay(ti,bay); toast(`🗄 Server Tower #${ti+1} racked — tier ${Math.floor(bay/RACK.cols)+1}, bay ${bay%RACK.cols+1}`,'grn',6000); }
+        moveSel=null; controls.enabled=true;
+        const bar=document.getElementById('movebar'); if(bar) bar.style.display='none';
+        canvas.style.cursor='default'; return; }
+      S.towerPos={x:m.x,y:0,z:m.z}; S.towerRot=m.rot;          // on the floor: no hovering cases
+      if(typeof towerVis!=='undefined'&&towerVis) towerVis.position.y=0; }
     else if(m.kind==='rack'){ S.rackPos={x:m.x,y:m.y,z:m.z}; S.rackRot=m.rot; }
     else if(S.rigs[m.i]){ S.rigs[m.i].pos={x:m.x,y:m.y,z:m.z}; S.rigs[m.i].rot=m.rot; }
     save&&save();
@@ -8282,7 +8356,7 @@ canvas.addEventListener('contextmenu',e=>{
   if(TRAILER) return;
   e.preventDefault();
   if(moveSel){ endMove(true); return; }
-  if(rackHitAt(e)>0){ beginMove({kind:'rack'}); return; }
+  if(rackHitAt(e)>=0){ beginMove({kind:'rack'}); return; }
   if(typeof towerVis!=='undefined'&&towerVis&&towerVis.visible){
     const r=canvas.getBoundingClientRect();
     mouse.x=((e.clientX-r.left)/r.width)*2-1; mouse.y=-((e.clientY-r.top)/r.height)*2+1;
@@ -8612,7 +8686,7 @@ function frame(t){
     }
   });
   if(typeof towerVis!=='undefined'&&towerVis&&towerVis.visible&&towerVis.userData.fans)
-    spinFans(towerVis.userData.fans, dt, !noWatt && towerHash(towerNorm()[0])>0);
+    spinFans(towerVis.userData.fans, dt, !noWatt && towerStandIdx()>=0 && towerHash(towerNorm()[towerStandIdx()])>0);
   // rings pulse
   const pt=t/1000;
   rings.forEach((rg,i)=>{ if(!rg||!rg.visible) return;
