@@ -6735,9 +6735,13 @@ let _ocBusy=false;
    covers the chain the wallet is on, so without this list a visitor with no wallet,
    or a wallet on another chain, saw no pools at all. skipKey = the chain already
    shown in the per-wallet section. */
+/* Chains whose pools are retired from the join lists. Polygon has no node
+   behind it (no POL validator), so nobody should be sent to mine there. Rigs
+   already in a Polygon pool still show under MINING with STOP + CLAIM. */
+const POOL_HIDE={polygon:1};
 async function ocPublicPoolsHtml(skipKey){
   const E=await poolEthers();
-  const keys=Object.keys(WEB3CFG.chains).filter(k=>WEB3CFG.chains[k]&&WEB3CFG.chains[k].pools&&WEB3CFG.chains[k].pools.engine&&k!==skipKey);
+  const keys=Object.keys(WEB3CFG.chains).filter(k=>WEB3CFG.chains[k]&&WEB3CFG.chains[k].pools&&WEB3CFG.chains[k].pools.engine&&k!==skipKey&&!POOL_HIDE[k]);
   const blocks=await Promise.all(keys.map(async k=>{
     const c=WEB3CFG.chains[k];
     try{
@@ -6831,14 +6835,14 @@ async function fillChainPools(){
        getActivePools hides hosts whose node never heartbeats, which is every
        NFT-mining pool, so genesis pools were invisible before this list) */
     const engPools=[];
-    for(let i=0;i<Number(engN);i++) engPools.push(await eng.getPool(i));
+    if(!POOL_HIDE[c.key]) for(let i=0;i<Number(engN);i++) engPools.push(await eng.getPool(i));
     const enginePoolRows=engPools.map((p,i)=>{
       const menu=(p.targetIds||[]).map(t=>WEB3CFG.targets[Number(t)]?.sym||'?').join(' · ');
       const mine=p.owner.toLowerCase()===W3.addr.toLowerCase();
       return `<div class="prow${mine?' sel':''}"><div class="pi"><b>${p.active?'🟢':'🔴'} #${i} ${p.name}</b>
         <small>coins: <b>${menu}</b> · host ${w3Short(p.owner)}${mine?' (YOU)':''} · ${Number(p.minersActive)} rig${Number(p.minersActive)===1?'':'s'} mining</small></div>
         <div class="pf">${(Number(p.rewardFeeBps)/100).toFixed(1)}%<small>fee</small></div></div>`;
-    }).join('')||`<p style="color:var(--dim);font-size:11px">No on-chain pools yet — be the first host on ${c.name}.</p>`;
+    }).join('')||(POOL_HIDE[c.key]?`<p style="color:var(--dim);font-size:11px">${c.name} pools are retired (no ${c.name} node). Mine on <b>Altcoinchain</b> — WTX, BITN, ALT and HTH pools are listed below. Rigs already mining here can still STOP + CLAIM.</p>`:`<p style="color:var(--dim);font-size:11px">No on-chain pools yet — be the first host on ${c.name}.</p>`);
     /* my on-chain rigs + sessions */
     let rigRows='';
     for(let i=0;i<Number(rigN);i++){
@@ -7707,12 +7711,31 @@ function osAppMiner(body){
      (WTX / BITN / ALT / HTH …), not the sim's network list. One button per
      active pool that accepts this rig's algorithm; a click starts mining there. */
   const rg0=r();
-  if(typeof isLive==='function'&&isLive()&&rg0&&rg0.ocId!=null){
+  const onChainRig=rg0&&rg0.ocId!=null&&poolCfg()&&!POOL_HIDE[poolCfg().key];
+  if(typeof isLive==='function'&&isLive()&&rg0&&!onChainRig){
+    /* No Altcoinchain rig NFT behind this rig: still list the real Altcoinchain
+       pools (read without a wallet). A click goes through ocPickPool, which
+       switches the wallet and says plainly when no matching rig is held. */
+    const box=body.querySelector('#osm-nets'); box.style.flexWrap='wrap';
+    box.innerHTML='<span style="font-size:10px;color:#8a8a90">reading Altcoinchain pools…</span>';
+    (async()=>{
+      try{
+        const k='alt', c=WEB3CFG.chains[k], E=await poolEthers();
+        const eng=new E.Contract(c.pools.engine,POOL_ABI.engine,new E.JsonRpcProvider(c.rpc,c.chainId,{staticNetwork:true}));
+        const n=Number(await eng.poolCount()); const btns=[];
+        for(let i=0;i<n;i++){ const p=await eng.getPool(i); if(!p.active) continue;
+          const coins=(p.targetIds||[]).map(t=>WEB3CFG.targets[Number(t)]?.sym||'?').join('+');
+          btns.push(`<button class="os-task" data-pickpool="${k}:${i}:${Number(p.requiredAlgo)}" title="${p.name}">⛏ ${coins} <small>#${i}${p.owner.toLowerCase()===(W3.addr||'').toLowerCase()?' · free':''}</small></button>`); }
+        box.innerHTML=(btns.join('')||'<span style="font-size:10px;color:#ffae42">no Altcoinchain pools yet</span>')
+          +'<div style="flex-basis:100%;font-size:10px;color:#8a8a90;margin-top:4px">needs a rig NFT on Altcoinchain — rigs are separate NFTs per chain</div>';
+      }catch(e){ box.innerHTML='<span style="font-size:10px;color:#ff6b74">could not read Altcoinchain pools</span>'; }
+    })();
+  }
+  if(typeof isLive==='function'&&isLive()&&onChainRig){
     const box=body.querySelector('#osm-nets'); box.style.flexWrap='wrap';
     box.innerHTML='<span style="font-size:10px;color:#8a8a90">reading pools…</span>';
     (async()=>{
       const c=poolCfg();
-      if(!c){ box.innerHTML='<span style="font-size:10px;color:#ffae42">connect your wallet on Polygon or Altcoinchain to mine</span>'; return; }
       try{
         const eng=await poolCtr('engine'); const n=Number(await eng.poolCount()); const btns=[];
         for(let i=0;i<n;i++){ const p=await eng.getPool(i);
