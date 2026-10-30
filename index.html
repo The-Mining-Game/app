@@ -5233,8 +5233,12 @@ function towerSimStep(dt,t){
 }
 /* market */
 function sellCoin(cn, amt, recv){
+  /* LIVE: one SELL window for every coin — pick the other side of the pair,
+     see each venue's price after fees (wattxchange.app swap router). The demo
+     balance below is meaningless in LIVE, so it must not gate this. */
+  if(typeof isLive==='function' && isLive() && recv===undefined && typeof ocSellNative==='function'){ ocSellNative(cn); return true; }
   amt = amt===undefined ? S[cn] : Math.min(amt, S[cn]);
-  if(amt<=0.001){ SFX.err(); return false; }
+  if(amt<=0.001){ SFX.err(); toast(`No ${cn.toUpperCase()} to sell yet — mine some first`,'red'); return false; }
   /* LIVE mode: sell is a REAL DEX swap of the player's wallet coin -> WATT.
      It operates on the on-chain wallet balance, not the sim S[cn] counter, so
      ask how much wallet coin to swap (never dump the whole native balance —
@@ -6549,6 +6553,13 @@ const NATC={
   hth: {sym:'HTH', name:'HTH', emoji:'🏠', tid:4, wrap:'wHTH',  api:'https://hth-api.wattxchange.app/api/address/',  exp:'https://hth-exp.wattxchange.app/address/'},
   bitn:{sym:'BITN',name:'Bitnet',emoji:'🅱', tid:5, wrap:'wBITN', api:'https://bitn-exp.wattxchange.app/api/address/', exp:'https://bitn-exp.wattxchange.app/address/'},
 };
+/* wallet coins (EVM / WTX) share the same SELL window; balance = live wallet */
+const SELLC={
+  pol:{sym:'POL',name:'Polygon',emoji:'🟣',evm:true},
+  alt:{sym:'ALT',name:'Altcoinchain',emoji:'🟠',evm:true},
+  wtx:{sym:'WTX',name:'WATTx',emoji:'🟡',evm:true},
+};
+const NAT_PILLS=['hth','bitn'];
 const ROUTER_API=WATT_BRIDGE_API+'/router';
 const NB={hth:{nat:null,usd:null},bitn:{nat:null,usd:null}}; let _nbT=0, _nbHubFor=null;
 function nbAddr(cn){ let a=''; try{ a=localStorage.getItem('mgAddr_'+cn)||''; }catch(e){} return a||NB[cn].hub||''; }
@@ -6572,9 +6583,11 @@ async function nbRefresh(force){
   }));
   renderNativePills();
 }
-function nbTotal(cn){ return (NB[cn].nat||0)+((typeof W3X!=='undefined'&&W3X[NATC[cn].wrap])||0); }
+function nbTotal(cn){
+  if(SELLC[cn]) return (W3.live&&W3.live[cn]&&W3.live[cn].nat)||0;
+  return (NB[cn].nat||0)+((typeof W3X!=='undefined'&&W3X[NATC[cn].wrap])||0); }
 function renderNativePills(){
-  for(const cn in NATC){
+  for(const cn of NAT_PILLS){
     const c=NATC[cn], v=$('v-'+cn), p=$('p-'+cn), b=$('sell-'+cn), box=$('coin-'+cn); if(!v) continue;
     v.textContent=fmt(nbTotal(cn));
     p.textContent=NB[cn].usd!=null?usdFmt(NB[cn].usd):'—';
@@ -6590,7 +6603,13 @@ setInterval(()=>{ try{ nbRefresh(); }catch(e){} },60000);
 /* where each aggregator route is executed on wattxchange.app */
 const ROUTE_LABEL={'evm-route':'EVM DEX route','gleecdex':'GleecDEX atomic swap','thorchain':'THORChain','wattx-desk':'WATT⇄WTX bridge desk',
   'swapin':'SwapinDEX','uniswap':'Uniswap','exolix':'Exolix','sideshift':'SideShift','changenow':'ChangeNOW','pepe-desk':'PEPE desk'};
-function routeLinks(r,from){
+function routeLinks(r,from,to){
+  const out=[];
+  if((from==='ALT'||from==='POL')&&to==='WATT'&&(r.steps||[]).length<=2&&r.provider!=='thorchain') out.push(['⚡ SWAP NOW (in-game)','ingame:dex']);
+  if(from==='WTX'&&to==='WATT'&&(r.provider==='wattx-desk'||r.provider==='evm-route')) out.push(['🌉 BRIDGE NOW (in-game)','ingame:wtx']);
+  return out.concat(routeLinks0(r,from));
+}
+function routeLinks0(r,from){
   if(r.provider==='gleecdex') return [['⚛ OPEN ATOMIC SWAP ↗','https://wattxchange.app/#defi/atomic-swap']];
   if(r.provider==='evm-route'){
     const out=[]; if(NATC[from.toLowerCase()]) out.push([`1 · WRAP ${from}→w${from} ↗`,'https://bridge.wattxchange.app/wrap']);
@@ -6600,14 +6619,15 @@ function routeLinks(r,from){
 }
 const nf=(x)=>x==null?'—':(Math.abs(x)<0.01&&x!==0?Number(x).toPrecision(3):Number(x).toLocaleString(undefined,{maximumFractionDigits:4}));
 async function ocSellNative(cn){
-  const c=NATC[cn]; if(!c) return;
+  const c=NATC[cn]||SELLC[cn]; if(!c) return;
+  const isNat=!!NATC[cn];
   document.getElementById('sxp')?.remove();
-  const targets=['WATT','WTX','ALT','POL',cn==='hth'?'BITN':'HTH'];
+  const targets=['WATT','WTX','ALT','POL','HTH','BITN'].filter(t=>t!==c.sym);
   let to='WATT', seq=0;
   const ov=document.createElement('div'); ov.id='sxp';
   ov.innerHTML=`<div class="box">
     <h3>💱 SELL ${c.sym} <small style="color:#8d97ab;font-weight:400">· best price across wattxchange.app</small></h3>
-    <div class="row"><input id="sx-addr" placeholder="your ${c.sym} address (reads your balance)" value="${nbAddr(cn)}"><button class="hbtn" id="sx-save">SAVE</button></div>
+    ${isNat?`<div class="row"><input id="sx-addr" placeholder="your ${c.sym} address (reads your balance)" value="${nbAddr(cn)}"><button class="hbtn" id="sx-save">SAVE</button></div>`:''}
     <div id="sx-bal" style="color:#8d97ab;margin:2px 0 6px"></div>
     <div class="row"><input id="sx-amt" type="number" min="0" step="any" placeholder="amount of ${c.sym}"><button class="hbtn" id="sx-max">MAX</button></div>
     <div style="color:#8d97ab;font-size:10.5px;letter-spacing:.1em;margin-top:8px">RECEIVE</div>
@@ -6617,7 +6637,9 @@ async function ocSellNative(cn){
     <button class="hbtn" id="sx-x" style="margin-top:10px;width:100%">close</button></div>`;
   document.body.appendChild(ov);
   const q=$('sx-q'), amtEl=$('sx-amt');
-  const bal=()=>{ const a=nbAddr(cn), w=(typeof W3X!=='undefined'&&W3X[c.wrap])||0;
+  const bal=()=>{
+    if(!isNat){ $('sx-bal').innerHTML=W3.addr?`wallet balance <b style="color:#e6e9f0">${nf(nbTotal(cn))} ${c.sym}</b> (keep a little for gas)`:'connect your wallet (🦊 WALLET) to sell from it — quotes work without one'; return; }
+    const a=nbAddr(cn), w=(typeof W3X!=='undefined'&&W3X[c.wrap])||0;
     $('sx-bal').innerHTML=a?`balance <b style="color:#e6e9f0">${nf(NB[cn].nat||0)} ${c.sym}</b> native${w?` + ${nf(w)} ${c.wrap}`:''} · <a href="${c.exp}${encodeURIComponent(a)}" target="_blank" rel="noopener" style="color:#7fb4ff">explorer ↗</a>`
       :(w?`${nf(w)} ${c.wrap} in your EVM wallet`:'enter your address to read your balance'); };
   bal();
@@ -6640,28 +6662,34 @@ async function ocSellNative(cn){
         ${fees.length?`<small>fees: ${fees.join(' · ')}</small>`:''}
         ${steps.length?`<small>${steps.join('<br>')}</small>`:''}
         ${r.capacityWarning?`<small style="color:#ffb145">${r.capacityWarning}</small>`:''}${r.note&&!/indicative/.test(r.note)?`<small>${r.note}</small>`:''}
-        <div class="act">${routeLinks(r,c.sym).map(([l,u])=>`<button class="hbtn accent" data-go="${u}">${l}</button>`).join('')}</div></div>`;
+        <div class="act">${routeLinks(r,c.sym,to).map(([l,u])=>`<button class="hbtn accent" data-go="${u}">${l}</button>`).join('')}</div></div>`;
     }).join('');
     const errs=(j.errors||[]).map(e=>`<small class="bad">${ROUTE_LABEL[e.provider]||e.provider}: ${e.error}</small>`).join('');
     q.innerHTML=html||`<div class="rt"><div class="h"><span>No live route for ${c.sym} → ${to} yet</span></div>${errs||'<small>no venue lists this pair</small>'}
-      <small>Once the w${c.sym}/WATT pool on SwapinDEX has liquidity (or the GleecDEX maker lists ${c.sym}), quotes appear here automatically.</small>
-      <div class="act"><button class="hbtn accent" data-go="https://bridge.wattxchange.app/wrap">WRAP ${c.sym} ↗</button><button class="hbtn" data-go="https://wattxchange.app/#dex">OPEN DEX ↗</button></div></div>`;
+      <small>${isNat?`Once the w${c.sym}/WATT pool on SwapinDEX has liquidity (or the GleecDEX maker lists ${c.sym}), quotes appear here automatically.`:'No venue has liquidity for this pair right now — try another coin.'}</small>
+      <div class="act">${isNat?`<button class="hbtn accent" data-go="https://bridge.wattxchange.app/wrap">WRAP ${c.sym} ↗</button>`:''}<button class="hbtn" data-go="https://wattxchange.app/#dex">OPEN DEX ↗</button></div></div>`;
     if(html&&errs) q.insertAdjacentHTML('beforeend',`<div class="rt">${errs}</div>`);
-    q.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{ SFX.click(); window.open(b.dataset.go,'_blank','noopener'); });
+    q.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{ SFX.click(); const g=b.dataset.go;
+      if(g==='ingame:dex'){ ov.remove(); onchainSell(cn,amt); return; }
+      if(g==='ingame:wtx'){ ov.remove(); bridgeSellWtx(amt); return; }
+      window.open(g,'_blank','noopener'); });
   };
   let t=null; const deb=()=>{ clearTimeout(t); t=setTimeout(run,450); };
   amtEl.oninput=deb;
   $('sx-max').onclick=()=>{ amtEl.value=String(+nbTotal(cn).toFixed(8)||''); run(); };
   $('sx-to').querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{ to=b.dataset.t; SFX.click();
     $('sx-to').querySelectorAll('[data-t]').forEach(x=>x.classList.toggle('on',x===b)); run(); });
-  $('sx-save').onclick=async()=>{ const a=$('sx-addr').value.trim();
+  if(isNat) $('sx-save').onclick=async()=>{ const a=$('sx-addr').value.trim();
     if(a&&!ocAddrLooksOk(c.sym,a)){ SFX.err(); toast('That does not look like a '+c.sym+' address','red'); return; }
     nbSetAddr(cn,a); SFX.buy(); await nbRefresh(true); bal(); if(!amtEl.value&&nbTotal(cn)>0){ amtEl.value=String(+nbTotal(cn).toFixed(8)); } run(); };
   $('sx-x').onclick=()=>ov.remove();
   ov.onclick=(e)=>{ if(e.target===ov) ov.remove(); };
-  if(nbTotal(cn)>0) amtEl.value=String(+nbTotal(cn).toFixed(8)); else amtEl.value='100';
+  if(isNat&&nbTotal(cn)>0) amtEl.value=String(+nbTotal(cn).toFixed(8)); else amtEl.value=isNat?'100':(nbTotal(cn)>0?String(+(nbTotal(cn)*0.5).toFixed(6)):'1');
   run();
-  nbRefresh(true).then(()=>{ if(document.getElementById('sxp')) bal(); });
+  if(isNat) nbRefresh(true).then(()=>{ if(document.getElementById('sxp')) bal(); });
+  else { if(typeof w3LiveBalances==='function') w3LiveBalances(true).catch(()=>{});
+    /* balances can land a moment after the window opens — redraw as they do */
+    let tries=0; const iv=setInterval(()=>{ if(!document.getElementById('sxp')||++tries>12){ clearInterval(iv); return; } bal(); },1000); }
 }
 function poolCfg(){ return (W3.addr&&W3.chain&&W3.chain.pools)?W3.chain:null; }
 async function poolCtr(kind,write){
