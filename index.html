@@ -5432,6 +5432,14 @@ function buyUpgrade(k){
      — direct: no/low credit -> a wallet-signed transfer per upgrade. */
   if(typeof isLive==='function' && isLive()){
     const p=upgPrice(k,lv);
+    /* When GarageUpgrades is deployed, EVERY live buy goes through the contract
+       (it spends on-chain credit or asks for a signed transfer) so the level is
+       recorded on-chain and never lost. Only when the contract is absent do we
+       fall back to the old local-credit shortcut. */
+    if(typeof garageAddr==='function' && garageAddr()){
+      if(typeof ocBuyUpgrade==='function') ocBuyUpgrade(k);
+      return;
+    }
     if(S.watt>=p){ S.watt-=p; applyUpgrade(k); toast(`Paid from game credit — ${fmt(S.watt)} ⚡ credit left`,'cyan',6000); return; }
     if(typeof ocBuyUpgrade==='function' && ecoCfg && ecoCfg()) ocBuyUpgrade(k);
     else { SFX.err(); toast('Connect a wallet on Polygon or Altcoinchain to buy upgrades with your real WATT','red',8000); }
@@ -5471,7 +5479,7 @@ const WEB3CFG={
          + migrator carry over from the v1 set (same NFT, re-authorized). */
       pools:{ registry:'0xC65E46645EF9d7Bf1F7D526c9Fb4F4B54704d1DE', hub:'0x8eC1Fa15A1DFB038396176a122ED2D385Ee04339',
               engine:'0x8d372e3e1fbB82e707D09f782a1e3959DC447354', rigNft:'0xf9F94e9fa744DE1209EF28321604a0Aa3B21a884', stakingPool:'0x07ef3eCDB4e4fd9D914787031b6cB746340bF661', migrator:'0xf2DbF910aD1cA08c3879C72AE6277fA903E058c4' },
-      economy:{ items:'0x0CDbf4926a8EdFFaa803B96f8fa90B065DE19Eb2', shop:'0xeE6B67c3993884F1b693A4a66e952Bb563463131', stakingPool:'0x7E8FC9d7D7588F410E1399aC690F901268B08a8d', wattV2:'0x387693eCEC037C61943404F03c097d2ADA15ae3f' },
+      economy:{ items:'0x0CDbf4926a8EdFFaa803B96f8fa90B065DE19Eb2', shop:'0xeE6B67c3993884F1b693A4a66e952Bb563463131', stakingPool:'0x7E8FC9d7D7588F410E1399aC690F901268B08a8d', wattV2:'0x387693eCEC037C61943404F03c097d2ADA15ae3f', garageUpgrades:'0x638237e726Fccb48B3573Fa7741bE07e020fb8EB' },
       /* QuickSwap V2 — WATTv2/WPOL pool 0x823a6484… (v2 has its own pool now).
          Sell POL→WATT v2 native-in via the same router. */
       dex:{ kind:'univ2', router:'0xa5E0829CaCED8fFDD4De3c43696c57F7D7A678ff', weth:'0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270',
@@ -5490,7 +5498,7 @@ const WEB3CFG={
          their 100k on ALT or Polygon; rigNft/staking/migrator carry over. */
       pools:{ registry:'0x88beBed99cb45D81F5DEd708682C55a2b26a221C', hub:'0x7Cee30E196Cb298e4634D7192C527dA37f2C7d57',
               engine:'0x755dCf18b521BC7e42f88fdfEBa2C910809AF09F', rigNft:'0x131A875e1bfEB2B3735E5d9Ad5e8871fF6CE9381', stakingPool:'0x62fC935400104371777aD36B78CF73f2c48dcD24', migrator:'0xdB13ecc87960632b8aAe93640F246CdAE1675B78' },
-      economy:{ items:'0x851fd0205348783444Fc9EDe99Ca2321681EC99b', shop:'0x92809C4a46b4D0F11a48BE21fF13202EA56DcEB1', stakingPool:'0xa3f8B04310380cD13Ec85B11420d1fc848af36C4', wattV2:'0xB7635E386283CAE6FB1A710f19CaA8220beF630D' },
+      economy:{ items:'0x851fd0205348783444Fc9EDe99Ca2321681EC99b', shop:'0x92809C4a46b4D0F11a48BE21fF13202EA56DcEB1', stakingPool:'0xa3f8B04310380cD13Ec85B11420d1fc848af36C4', wattV2:'0xB7635E386283CAE6FB1A710f19CaA8220beF630D', garageUpgrades:'0x2314fb7BA3D580cc040629028D041241d25B6fd2' },
       /* SwapinDEX (original live venue) — WATT/wALT pool 0xb2F8e147…. Sell ALT→WATT native-in. */
       dex:{ kind:'univ2', router:'0xae168Ce47cebca9abbC5107a58df0532f1afa4d6', weth:'0x48721ADeFE5b97101722c0866c2AffCE797C32b6',
             wattOut:'0x6645143e49B3a15d8F205658903a55E520444698' } },
@@ -5508,7 +5516,7 @@ const WEB3CFG={
       /* pools: RETIRED v1-stake set (ABI mismatch with the V3 client) — the V3
          multi-coin deploy fills this slot when it lands on WATTx. */
       pools:null,
-      economy:{ items:'0x9baaFDE958d0dE13043CBb4292e467EB00ED06B4', shop:'0x0239f289Cca84E7Bb899Fe065ba452293D501355', stakingPool:'0xe9000a1ba29c3e87B4F964E9514eA4e8fd5d5749', wattV2:'0xc4603E2582aE320857379819123dFbFd3093dcfa' } },
+      economy:{ items:'0x9baaFDE958d0dE13043CBb4292e467EB00ED06B4', shop:'0x0239f289Cca84E7Bb899Fe065ba452293D501355', stakingPool:'0xe9000a1ba29c3e87B4F964E9514eA4e8fd5d5749', wattV2:'0xc4603E2582aE320857379819123dFbFd3093dcfa', garageUpgrades:null } },
   },
   /* PayoutHub target ids, in deploy-script registration order (identical on
      every chain because the same script registers the same list). */
@@ -5721,6 +5729,7 @@ async function w3Refresh(force){
     await Promise.allSettled(jobs);
     await w3Positions();               // staked components (escrowed, not in the wallet)
     w3GrantOwned(force);
+    if(typeof ocSyncGarage==='function') await ocSyncGarage();  // mirror on-chain garage add-on levels + credit into S.upg / S.watt
     /* the classic trap: EVERYTHING is staked -> wallet reads empty -> empty
        garage with nothing to click. Say so instead of showing a bare room. */
     if(typeof isLive==='function'&&isLive()&&S&&S.rigs.length===0
@@ -6975,13 +6984,84 @@ async function ocPayToStakers(cost,label){
   if(ok===null){ toast('Payment still pending — applies when it confirms (leave this open)','gold',9000); ok=await w3WaitTx(tx,480); if(ok!==true) return false; }
   return true;
 }
-/* LIVE garage upgrade: same WATT price as the sim, paid in REAL WATT v2 via
-   the pool's fund() so stakers are credited instantly (V1 = pro-rata on fund). */
+/* ===== GarageUpgrades — ON-CHAIN power/cooling/rack levels + prepaid credit =====
+   The levels used to live only in localStorage, so they reset whenever that was
+   lost (new device, cleared cache, failed write) even though the WATT was really
+   spent. GarageUpgrades stores them per-wallet on-chain and forwards the WATT to
+   the SAME stakers pool, so add-ons persist like NFTs do. Kinds MUST match the
+   contract: power=0, cooling=1, rack=2, rackgpu=3. */
+const GARAGE_KIND={power:0,cooling:1,rack:2,rackgpu:3};
+const GARAGE_ABI=[
+  'function buyUpgrade(uint8 kind)',
+  'function topUp(uint256 amountWhole)',
+  'function garageState(address user) view returns (uint32 power,uint32 cooling,uint32 rack,uint32 rackgpu,uint256 credit)',
+  'function costOf(address user,uint8 kind) view returns (uint256)'];
+function garageAddr(){ const c=ecoCfg(); return (c&&c.economy&&c.economy.garageUpgrades)||null; }
+async function garageContract(write){
+  const E=await poolEthers(); const addr=garageAddr(); if(!addr) return null;
+  if(write){ const prov=new E.BrowserProvider(w3Eth()); const signer=await prov.getSigner(); return new E.Contract(addr,GARAGE_ABI,signer); }
+  return new E.Contract(addr, GARAGE_ABI, new E.JsonRpcProvider(W3.chain.rpc));
+}
+/* Pull the authoritative add-on levels + prepaid credit from the chain and
+   mirror them into S (live mode only). MAX against local so a sync can only
+   RAISE a level, never visibly downgrade a player mid-migration. */
+async function ocSyncGarage(){
+  if(!(typeof isLive==='function'&&isLive())||!W3.addr||!garageAddr()) return;
+  try{
+    const g=await garageContract(false); if(!g) return;
+    const s=await g.garageState(W3.addr);
+    S.upg.power  =Math.max(S.upg.power||0,  Number(s.power));
+    S.upg.cooling=Math.max(S.upg.cooling||0,Number(s.cooling));
+    S.upg.rack   =Math.max(S.upg.rack||0,   Number(s.rack));
+    S.upg.rackgpu=Math.max(S.upg.rackgpu||0,Number(s.rackgpu));
+    /* NOTE: only LEVELS are mirrored (they only ever rise → max() is safe). The
+       prepaid credit (S.watt in live) is left as local session state, in step
+       with the contract via topUp/buyUpgrade; overwriting it from chain here
+       would refund credit-paid structure purchases (chair/container/warehouse),
+       which spend S.watt but are not recorded on-chain. */
+    if(typeof rebuildAllRigs==='function') rebuildAllRigs();
+    renderHud&&renderHud(); if(typeof renderUpg==='function'&&$('m-upg')&&$('m-upg').classList.contains('open')) renderUpg();
+    save&&save();
+  }catch(e){ /* RPC hiccup — keep the saved levels, try again next sync */ }
+}
+/* LIVE garage upgrade: paid in REAL WATT v2 and RECORDED on-chain by
+   GarageUpgrades (level persists per wallet). Spends prepaid credit if it
+   covers the price, else the wallet signs a transfer; the contract forwards the
+   WATT to the stakers pool either way. Falls back to the old (local-only) flow
+   only while the contract is undeployed on this chain. */
 async function ocBuyUpgrade(k){
   const c=ecoCfg(); if(!c||!c.economy){ SFX.err(); toast('Connect a wallet on Polygon or Altcoinchain first','red'); return; }
   if(_upBusy){ toast('Upgrade payment already in flight…','gold'); return; }
   const lv=S.upg[k]||0, max=upgMax(k); if(lv>=max){ SFX.err(); return; }
   const p=upgPrice(k,lv);
+  if(!garageAddr()){ return ocBuyUpgradeLegacy(k,p,c); }  // contract not live yet
+  const kind=GARAGE_KIND[k]; if(kind===undefined){ SFX.err(); return; }
+  _upBusy=true;
+  try{
+    const E=await poolEthers();
+    const g=await garageContract(true);
+    const cost=BigInt(Math.round(p))*10n**18n;
+    const fromCredit=(S.watt||0)>=p;   // contract spends prepaid credit first — mirrors S.watt
+    if(!fromCredit){
+      // wallet-pay buy: ensure WATT allowance to the garage contract
+      const watt=new E.Contract(c.economy.wattV2, POOL_ABI.erc20, await (new E.BrowserProvider(w3Eth())).getSigner());
+      if((await watt.allowance(W3.addr, garageAddr()))<cost){
+        toast('Approve WATT to the garage contract (covers your upgrades)…','gold',8000);
+        await (await watt.approve(garageAddr(), cost*64n)).wait();   // headroom so later buys need no re-approve
+      }
+    }
+    toast(`⛓ Buying — ${fmt(p)} ⚡WATT on ${c.name}${fromCredit?' (from credit)':''}…`,'gold',9000);
+    await (await g.buyUpgrade(kind)).wait();
+    if(fromCredit) S.watt=Math.max(0,(S.watt||0)-p);  // reflect credit spend until the sync corrects it exactly
+    applyUpgrade(k);  // bump local level + save() so the UI reflects it immediately
+    toast(`⛓ ${names_up(k)} saved on-chain (Lv ${S.upg[k]}) — persists across devices now`,'grn',9000);
+    w3Refresh&&w3Refresh();
+  }catch(e){ SFX.err(); toast('upgrade cancelled: '+(''+(e&&(e.reason||e.message)||e)).slice(0,80),'red',8000); }
+  finally{ _upBusy=false; }
+}
+function names_up(k){ return ({power:'⚡ Power grid',cooling:'❄ Cooling',rack:'🏠 Garage expansion',rackgpu:'🗄 Rack expansion'})[k]||'Upgrade'; }
+/* legacy fallback: pay stakers directly, apply level locally (pre-contract). */
+async function ocBuyUpgradeLegacy(k,p,c){
   _upBusy=true;
   try{
     if(await ocPayToStakers(BigInt(Math.round(p))*10n**18n, fmt(p)+' ⚡WATT')){
@@ -7015,9 +7095,26 @@ async function ocTopUp(amt){
   if(_upBusy){ toast('A payment is already in flight…','gold'); return; }
   _upBusy=true;
   try{
-    if(!(await ocPayToStakers(BigInt(amt)*10n**18n, fmt(amt)+' ⚡WATT'))) return;
-    S.watt+=amt; save(); SFX.buy();
-    toast(`⛓ ${fmt(amt)} ⚡ GAME CREDIT loaded — upgrades now buy without more signatures`,'gold',10000);
+    if(garageAddr()){
+      /* record credit ON-CHAIN via GarageUpgrades.topUp (it funds the stakers
+         pool itself) so the credit survives a device/cache change too. */
+      const E=await poolEthers();
+      const g=await garageContract(true);
+      const wei=BigInt(amt)*10n**18n;
+      const watt=new E.Contract(c.economy.wattV2, POOL_ABI.erc20, await (new E.BrowserProvider(w3Eth())).getSigner());
+      if((await watt.allowance(W3.addr, garageAddr()))<wei){
+        toast('Approve WATT to the garage contract…','gold',8000);
+        await (await watt.approve(garageAddr(), wei)).wait();
+      }
+      toast(`⛓ Loading ${fmt(amt)} ⚡ credit on-chain…`,'gold',9000);
+      await (await g.topUp(BigInt(amt))).wait();
+      S.watt+=amt; save(); SFX.buy();
+      toast(`⛓ ${fmt(amt)} ⚡ GAME CREDIT loaded on-chain — persists across devices, buys need no more signatures`,'gold',11000);
+    } else {
+      if(!(await ocPayToStakers(BigInt(amt)*10n**18n, fmt(amt)+' ⚡WATT'))) return;
+      S.watt+=amt; save(); SFX.buy();
+      toast(`⛓ ${fmt(amt)} ⚡ GAME CREDIT loaded — upgrades now buy without more signatures`,'gold',10000);
+    }
     renderHud&&renderHud(); if(typeof renderUpg==='function'&&$('m-upg')&&$('m-upg').classList.contains('open')) renderUpg();
     w3Refresh&&w3Refresh();
   }catch(e){ SFX.err(); toast('top-up cancelled: '+(''+(e&&(e.reason||e.message)||e)).slice(0,80),'red',8000); }
